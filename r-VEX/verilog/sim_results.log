@@ -1,0 +1,50 @@
+### Building unit testbench ###
+### Running unit testbench ###
+================ r-VEX unit tests ================
+[ALU]
+  PASS ADD 7+35 : 0x0000002a
+  PASS SUB 50-8 : 0x0000002a
+  PASS SHR arith : 0xffffffff
+  PASS SHRU logical : 0x0fffffff
+  PASS SXTB 0x80 : 0xffffff80
+  PASS CMPLT -5<3 : 0x00000001
+  PASS ADDCG carry : 1
+  PASS MTB bit : 1
+  PASS SLCT true : 0x0000aaaa
+  PASS SLCTF true->s2 : 0x00005555
+[MUL] (bug fixes)
+  PASS MPYLL 3*4 : 0x0000000c
+  PASS x8000*1 unsigned : 0x00008000
+  PASS *0x8000 unsigned : 0x00008000
+  PASS MPYHS 1*1 <<16 : 0x00010000
+  PASS MPYHH signed sq : 0x40000000
+[MEM] (bug fixes + PFT)
+  PASS LDB  sign 0x80 : 0xffffff80
+  PASS LDBU zero 0x80 : 0x00000080
+  PASS LDH  sign 0x8000 : 0xffff8000
+  PASS LDHU zero 0x8000 : 0x00008000
+  PASS STW : 0xdeadbeef
+  PASS PFT valid : 1
+  PASS PFT no-load : 0
+  PASS PFT no-store : 0
+==================================================
+UNIT TESTS: 23 passed, 0 failed
+RESULT: ALL UNIT TESTS PASSED
+tb_units.v:89: $finish called at 21000 (1ps)
+
+### Building core testbench ###
+### Running core testbench ###
+================ r-VEX core test ================
+  done=1  cycles=11  (timeout counter=13)
+  PASS gr1 (=5) : 0x00000005
+  PASS gr2 (=0x80) : 0x00000080
+  PASS gr3 (MPYLL 640) : 0x00000280
+  PASS dmem0 (STW) : 0x00000080
+  PASS gr5 (LDB sign) : 0xffffff80
+  PASS gr6 (LDBU zero) : 0x00000080
+  PASS gr7 (skipped=0) : 0x00000000
+  PASS ncl XNOP-3 stall : 0x0000000b
+=================================================
+CORE TEST: 8 passed, 0 failed
+RESULT: CORE TEST PASSED
+tb_core.v:95: $finish called at 145000 (1ps)

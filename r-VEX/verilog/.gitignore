@@ -1,0 +1,3 @@
+# Icarus Verilog build artifacts
+*.vvp
+*.vcd
