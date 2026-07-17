@@ -240,6 +240,22 @@ CTRL TESTS: 32 passed, 0 failed
 RESULT: ALL CTRL TESTS PASSED
 tb_ctrl.v:112: $finish called at 13000 (1ps)
 
+### Building tb_alu_rand ###
+### Running  tb_alu_rand ###
+========= r-VEX ALU constrained-random (4000 vectors) =========
+==============================================================
+ALU RANDOM: 12000 checks, 0 failed
+RESULT: ALU RANDOM PASSED
+tb_alu_rand.v:134: $finish called at 4000000 (1ps)
+
+### Building tb_mul_rand ###
+### Running  tb_mul_rand ###
+========= r-VEX MUL constrained-random (4000 vectors) =========
+==============================================================
+MUL RANDOM: 12000 checks, 0 failed
+RESULT: MUL RANDOM PASSED
+tb_mul_rand.v:110: $finish called at 4000000 (1ps)
+
 ### Building tb_core ###
 ### Running  tb_core ###
 ================ r-VEX core test ================
@@ -276,12 +292,34 @@ CORE PROG #2: 10 passed, 0 failed
 RESULT: CORE PROGRAM #2 PASSED
 tb_core_prog.v:117: $finish called at 125000 (1ps)
 
+### Building tb_core_carry ###
+### Running  tb_core_carry ###
+========== r-VEX core program #3 (ADDCG + mem) ==========
+  done=1  cycles=14
+  PASS r11 (0x80000000) : 0x80000000
+  PASS r14 ADDCG-lo sum : 0x00000000
+  PASS br7 carry-out : 1
+  PASS  ADDCG-hi (0x31) : 0x00000031
+  PASS br6 hi carry-out : 0
+  PASS r16 (0xABCD) : 0x0000abcd
+  PASS mem[4] after STB : 0xabcd3377
+  PASS DHU (0x0000ABCD) : 0x0000abcd
+  PASS DH  (0xFFFFABCD) : 0xffffabcd
+  PASS DBU (0x00000077) : 0x00000077
+=========================================================
+CORE PROG #3: 10 passed, 0 failed
+RESULT: CORE PROGRAM #3 PASSED
+tb_core_carry.v:125: $finish called at 175000 (1ps)
+
 ================= SUITE SUMMARY =================
 RESULT: ALL UNIT TESTS PASSED
 RESULT: ALL ALU FULL TESTS PASSED
 RESULT: ALL MUL FULL TESTS PASSED
 RESULT: ALL MEM FULL TESTS PASSED
 RESULT: ALL CTRL TESTS PASSED
+RESULT: ALU RANDOM PASSED
+RESULT: MUL RANDOM PASSED
 RESULT: CORE TEST PASSED
 RESULT: CORE PROGRAM #2 PASSED
+RESULT: CORE PROGRAM #3 PASSED
 OVERALL: ALL SUITES PASSED

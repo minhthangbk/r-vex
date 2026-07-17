@@ -8,8 +8,11 @@
 #   tb_mul_full   MUL incl. saturation / overflow flag
 #   tb_mem_full   all load/store byte-half positions
 #   tb_ctrl       ctrl_unit branch/link directed tests
+#   tb_alu_rand   constrained-random ALU vs reference model
+#   tb_mul_rand   constrained-random MUL vs reference model
 #   tb_core       original integrated core program
 #   tb_core_prog  2nd core program (branch/CALL/RETURN/SLCT/VLIW)
+#   tb_core_carry 3rd core program (ADDCG carry-chain + STH/STB->load)
 set -e
 export PATH="/f/APPs/iverilog/bin:$PATH"
 cd "$(dirname "$0")"
@@ -31,9 +34,12 @@ run tb_units     "rvex_defs.vh alu.v mul.v mem_unit.v"        tb_units.v
 run tb_alu_full  "rvex_defs.vh alu.v"                         tb_alu_full.v
 run tb_mul_full  "rvex_defs.vh mul.v"                         tb_mul_full.v
 run tb_mem_full  "rvex_defs.vh mem_unit.v"                    tb_mem_full.v
-run tb_ctrl      "rvex_defs.vh ctrl_unit.v"                   tb_ctrl.v
-run tb_core      "$CORE"                                      tb_core.v
-run tb_core_prog "$CORE"                                      tb_core_prog.v
+run tb_ctrl       "rvex_defs.vh ctrl_unit.v"                  tb_ctrl.v
+run tb_alu_rand   "rvex_defs.vh alu.v"                        tb_alu_rand.v
+run tb_mul_rand   "rvex_defs.vh mul.v"                        tb_mul_rand.v
+run tb_core       "$CORE"                                     tb_core.v
+run tb_core_prog  "$CORE"                                     tb_core_prog.v
+run tb_core_carry "$CORE"                                     tb_core_carry.v
 
 echo "================= SUITE SUMMARY =================" | tee -a "$LOG"
 grep -E 'RESULT:' "$LOG" | tee -a "$LOG"
