@@ -1,0 +1,287 @@
+### Building tb_units ###
+### Running  tb_units ###
+================ r-VEX unit tests ================
+[ALU]
+  PASS ADD 7+35 : 0x0000002a
+  PASS SUB 50-8 : 0x0000002a
+  PASS SHR arith : 0xffffffff
+  PASS SHRU logical : 0x0fffffff
+  PASS SXTB 0x80 : 0xffffff80
+  PASS CMPLT -5<3 : 0x00000001
+  PASS ADDCG carry : 1
+  PASS MTB bit : 1
+  PASS SLCT true : 0x0000aaaa
+  PASS SLCTF true->s2 : 0x00005555
+[MUL] (bug fixes)
+  PASS MPYLL 3*4 : 0x0000000c
+  PASS x8000*1 unsigned : 0x00008000
+  PASS *0x8000 unsigned : 0x00008000
+  PASS MPYHS 1*1 <<16 : 0x00010000
+  PASS MPYHH signed sq : 0x40000000
+[MEM] (bug fixes + PFT)
+  PASS LDB  sign 0x80 : 0xffffff80
+  PASS LDBU zero 0x80 : 0x00000080
+  PASS LDH  sign 0x8000 : 0xffff8000
+  PASS LDHU zero 0x8000 : 0x00008000
+  PASS STW : 0xdeadbeef
+  PASS PFT valid : 1
+  PASS PFT no-load : 0
+  PASS PFT no-store : 0
+==================================================
+UNIT TESTS: 23 passed, 0 failed
+RESULT: ALL UNIT TESTS PASSED
+tb_units.v:89: $finish called at 21000 (1ps)
+
+### Building tb_alu_full ###
+### Running  tb_alu_full ###
+================ r-VEX ALU full tests ================
+[arith/logical]
+  PASS ADD 7+35 : 0x0000002a
+  PASS SUB 50-8 : 0x0000002a
+  PASS AND : 0x0000f000
+  PASS ANDC ~s1&s2 : 0x0000f000
+  PASS OR : 0x00000ff0
+  PASS ORC ~s1|s2 : 0xfffffff0
+  PASS XOR : 0x0000f0f0
+  PASS MOV s1 : 0xcafebabe
+[min/max]
+  PASS MAX  s(-5,3) : 0x00000003
+  PASS MAXU u(-5,3) : 0xfffffffb
+  PASS MIN  s(-5,3) : 0xfffffffb
+  PASS MINU u(-5,3) : 0x00000003
+[shift/shadd]
+  PASS SH1ADD (5<<1)+3 : 0x0000000d
+  PASS SH2ADD (5<<2)+3 : 0x00000017
+  PASS SH3ADD (5<<3)+3 : 0x0000002b
+  PASS SH4ADD (5<<4)+3 : 0x00000053
+  PASS SHL 1<<4 : 0x00000010
+  PASS SHR arith : 0xffffffff
+  PASS SHRU logical : 0x0fffffff
+[sxt/zxt]
+  PASS SXTB 0x80 : 0xffffff80
+  PASS SXTH 0x8000 : 0xffff8000
+  PASS ZXTB : 0x00000078
+  PASS ZXTH : 0x00005678
+[compares]
+  PASS CMPEQ 5==5 : 0x00000001
+  PASS CMPEQ 5==6 : 0x00000000
+  PASS CMPNE 5!=6 : 0x00000001
+  PASS CMPGE  s 3>=-5 : 0x00000001
+  PASS CMPGE  s -5>=3 : 0x00000000
+  PASS CMPGEU u 3>=big : 0x00000000
+  PASS CMPGT  s 3>-5 : 0x00000001
+  PASS CMPGTU u big>3 : 0x00000001
+  PASS CMPLE  s -5<=3 : 0x00000001
+  PASS CMPLEU u 3<=big : 0x00000001
+  PASS CMPLT  s -5<3 : 0x00000001
+  PASS CMPLTU u 3<big : 0x00000001
+[bool logicals]
+  PASS NANDL(0,5)=1 : 0x00000001
+  PASS NANDL(5,5)=0 : 0x00000000
+  PASS NORL(0,0)=1 : 0x00000001
+  PASS NORL(0,5)=0 : 0x00000000
+  PASS ORL(0,0)=0 : 0x00000000
+  PASS ORL(0,5)=1 : 0x00000001
+  PASS ANDL(5,5)=1 : 0x00000001
+  PASS ANDL(0,5)=0 : 0x00000000
+[MTB]
+  PASS MTB set  s1[0]=1 : 1
+  PASS MTB clr  s1[0]=0 : 0
+[ADDCG]
+  PASS ADDCG 5+3+ci : 0x00000009
+  PASS ADDCG no carry : 0
+  PASS ADDCG wrap res : 0x00000000
+  PASS ADDCG carry-out : 1
+[DIVS]
+  PASS DIVS +: 8-2 : 0x00000006
+  PASS DIVS + cout : 0
+  PASS DIVS -: 9+2 : 0x0000000b
+  PASS DIVS - cout : 1
+[SLCT/SLCTF]
+  PASS SLCT  cin=1->s1 : 0x0000aaaa
+  PASS SLCT  cin=0->s2 : 0x00005555
+  PASS SLCTF cin=1->s2 : 0x00005555
+  PASS SLCTF cin=0->s1 : 0x0000aaaa
+[valid/invalid]
+  PASS p -> out_valid=1 : 1
+  PASS   -> out_valid=0 : 0
+  PASS p result cleared : 0x00000000
+======================================================
+ALU FULL: 60 passed, 0 failed
+RESULT: ALL ALU FULL TESTS PASSED
+tb_alu_full.v:143: $finish called at 59000 (1ps)
+
+### Building tb_mul_full ###
+### Running  tb_mul_full ###
+================ r-VEX MUL full tests ================
+[16x16->32]
+  PASS MPYLL 3*4 : 0x0000000c
+  PASS PYLL -2*3 signed : 0xfffffffa
+  PASS MPYLLU 0xFFFF*2 : 0x0001fffe
+  PASS MPYLH lo*hi 3*4 : 0x0000000c
+  PASS MPYLHU 0xFFFF*2 : 0x0001fffe
+  PASS MPYHH (-2^15)^2 : 0x40000000
+  PASS MPYHHU 0x8000*1 : 0x00008000
+[MPYL 32x16 signed sat]
+  PASS PYL 3*4 in-range : 0x0000000c
+  PASS MPYL no overflow : 0
+  PASS MPYL -2*3 signed : 0xfffffffa
+  PASS YL 2^20*2^12 sat : 0x7fffffff
+  PASS YL overflow flag : 1
+[MPYLU 32x16 unsigned sat]
+  PASS MPYLU 3*4 : 0x0000000c
+  PASS MPYLU 2^32 sat : 0xffffffff
+  PASS MPYLU overflow : 1
+[MPYHU 32x hi16 unsigned sat]
+  PASS MPYHU 1*0x8000 : 0x00008000
+  PASS MPYHU 2^32 sat : 0xffffffff
+  PASS MPYHU overflow : 1
+[MPYH 32x hi16 signed sat]
+  PASS MPYH 3*hi(2) : 0x00000006
+  PASS MPYH 2^32 +sat : 0x7fffffff
+  PASS MPYH overflow : 1
+[MPYHS 32x hi16 <<16]
+  PASS MPYHS 1*1 <<16 : 0x00010000
+  PASS MPYHS 3*2 <<16 : 0x00060000
+  PASS YHS overflow sat : 0xffffffff
+[nop/invalid]
+  PASS NOP -> 0 : 0x00000000
+  PASS NOP valid : 1
+  PASS bad op invalid : 0
+======================================================
+MUL FULL: 27 passed, 0 failed
+RESULT: ALL MUL FULL TESTS PASSED
+tb_mul_full.v:95: $finish called at 27000 (1ps)
+
+### Building tb_mem_full ###
+### Running  tb_mem_full ###
+================ r-VEX MEM full tests ================
+[LDW]
+  PASS LDW word : 0xdeadbeef
+  PASS LDW is_load : 1
+[LDH/LDHU]  half select: 00->[31:16] 01->[23:8] 10->[15:0]
+  PASS LDH  pos00 sign : 0xffff8000
+  PASS LDH  pos01 sign : 0xffff8000
+  PASS LDH  pos10 sign : 0xffff8000
+  PASS LDHU pos10 zero : 0x00008000
+  PASS LDHU pos00 zero : 0x00001234
+[LDB/LDBU]  byte select: 00->[31:24] 01->[23:16] 10->[15:8] 11->[7:0]
+  PASS LDB  pos00 sign : 0xffffff80
+  PASS LDB  pos01 sign : 0xffffff80
+  PASS LDB  pos10 sign : 0xffffff80
+  PASS LDB  pos11 sign : 0xffffff80
+  PASS LDBU pos11 zero : 0x00000080
+  PASS LDBU pos00 zero : 0x00000012
+[STW]
+  PASS STW word : 0xcafebabe
+  PASS STW is_store : 1
+[STH]  insert reg[15:0] into half slot
+  PASS STH pos00 : 0x1234ffff
+  PASS STH pos01 : 0xaa1234bb
+  PASS STH pos10 : 0xffff1234
+[STB]  insert reg[7:0] into byte slot
+  PASS STB pos00 : 0x78abcdef
+  PASS STB pos01 : 0xaa78cdef
+  PASS STB pos10 : 0xabcd78ef
+  PASS STB pos11 : 0xabcdef78
+[PFT/invalid]
+  PASS PFT valid : 1
+  PASS PFT no-load : 0
+  PASS PFT no-store : 0
+  PASS bad op invalid : 0
+======================================================
+MEM FULL: 26 passed, 0 failed
+RESULT: ALL MEM FULL TESTS PASSED
+tb_mem_full.v:95: $finish called at 24000 (1ps)
+
+### Building tb_ctrl ###
+### Running  tb_ctrl ###
+================ r-VEX CTRL unit tests ================
+[GOTO/IGOTO]
+  PASS GOTO taken : 1
+  PASS GOTO target : 0x20
+  PASS IGOTO taken : 1
+  PASS IGOTO target=lr : 0x30
+[CALL/ICALL]
+  PASS CALL taken : 1
+  PASS CALL target : 0x40
+  PASS CALL writes_link : 1
+  PASS CALL link=pc+1 : 0x00000006
+  PASS ICALL target=lr : 0x50
+  PASS ICALL link=pc+1 : 0x00000006
+[BR/BRF]
+  PASS BR br=1 taken : 1
+  PASS BR target : 0x60
+  PASS BR br=0 fall : 0
+  PASS BR fall=pc+1 : 0x08
+  PASS BRF br=0 taken : 1
+  PASS BRF target : 0x70
+  PASS BRF br=1 fall : 0
+  PASS BRF fall=pc+1 : 0x08
+[RETURN/RFI]
+  PASS RET taken : 1
+  PASS RET target=lr : 0x22
+  PASS RET link=sp+off : 0x00000104
+  PASS RET not rfi : 0
+  PASS RFI target=lr : 0x24
+  PASS RFI link=sp+off : 0x00000104
+  PASS RFI is_rfi : 1
+[XNOP]
+  PASS XNOP is_xnop : 1
+  PASS XNOP n : 5
+  PASS XNOP not taken : 0
+[NOP/invalid]
+  PASS NOP not taken : 0
+  PASS NOP pc+1 : 0x0a
+  PASS NOP valid : 1
+  PASS bad op invalid : 0
+======================================================
+CTRL TESTS: 32 passed, 0 failed
+RESULT: ALL CTRL TESTS PASSED
+tb_ctrl.v:112: $finish called at 13000 (1ps)
+
+### Building tb_core ###
+### Running  tb_core ###
+================ r-VEX core test ================
+  done=1  cycles=11  (timeout counter=13)
+  PASS gr1 (=5) : 0x00000005
+  PASS gr2 (=0x80) : 0x00000080
+  PASS gr3 (MPYLL 640) : 0x00000280
+  PASS dmem0 (STW) : 0x00000080
+  PASS gr5 (LDB sign) : 0xffffff80
+  PASS gr6 (LDBU zero) : 0x00000080
+  PASS gr7 (skipped=0) : 0x00000000
+  PASS ncl XNOP-3 stall : 0x0000000b
+=================================================
+CORE TEST: 8 passed, 0 failed
+RESULT: CORE TEST PASSED
+tb_core.v:95: $finish called at 145000 (1ps)
+
+### Building tb_core_prog ###
+### Running  tb_core_prog ###
+============= r-VEX core program #2 =============
+  done=1  cycles=9  (timeout counter=11)
+  PASS gr1 (=10) : 0x0000000a
+  PASS gr2 (=3) : 0x00000003
+  PASS gr3 (r1+r2=13) : 0x0000000d
+  PASS gr4 (MPYLL 30) : 0x0000001e
+  PASS br1 (r2<r1) : 1
+  PASS  (poison skip=0) : 0x00000000
+  PASS r6 (SLCT->r1=10) : 0x0000000a
+  PASS 63 (CALL link=8) : 0x00000008
+  PASS  (post-RET 0x55) : 0x00000055
+  PASS gr8 (subr 0x99) : 0x00000099
+=================================================
+CORE PROG #2: 10 passed, 0 failed
+RESULT: CORE PROGRAM #2 PASSED
+tb_core_prog.v:117: $finish called at 125000 (1ps)
+
+================= SUITE SUMMARY =================
+RESULT: ALL UNIT TESTS PASSED
+RESULT: ALL ALU FULL TESTS PASSED
+RESULT: ALL MUL FULL TESTS PASSED
+RESULT: ALL MEM FULL TESTS PASSED
+RESULT: ALL CTRL TESTS PASSED
+RESULT: CORE TEST PASSED
+RESULT: CORE PROGRAM #2 PASSED
+OVERALL: ALL SUITES PASSED
