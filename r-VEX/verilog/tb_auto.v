@@ -25,7 +25,7 @@ module tb_auto;
     wire done; wire [31:0] cycles;
     integer pass=0, fail=0, k;
     integer fd, code, widx, wexp, ridx, rexp, nchk;
-    integer maxcyc;
+    integer maxcyc, ngr;
     reg [1023:0] f_imem, f_dmem, f_chk, f_ret, nm;
 
     rvex_core dut(.clk(clk),.reset(reset),.start(start),.done(done),.cycles(cycles));
@@ -94,6 +94,17 @@ module tb_auto;
                 end
                 $fclose(fd);
             end
+        end
+
+        // ---- optional register dump, for debugging a kernel that misbehaves --
+        if ($value$plusargs("dumpgr=%d", ngr)) begin
+            $display("  -- general registers 0..%0d", ngr);
+            for (k = 0; k <= ngr; k = k + 1)
+                if (dut.gr[k] !== 32'd0)
+                    $display("     $r0.%0d = %0d (0x%08h)", k, $signed(dut.gr[k]), dut.gr[k]);
+            for (k = 0; k < 8; k = k + 1)
+                $write("     $b0.%0d=%b", k, dut.br[k]);
+            $display("\n     pc=%0d", dut.pc);
         end
 
         $display("-----------------------------------------------------------");

@@ -98,21 +98,33 @@ module rvex_core (
     // extension syllable is the NEXT higher slot; it carries the top 23 bits and
     // is marked with OP_SYLFOLW so it issues nothing of its own.  Slot 3 has no
     // successor and therefore cannot carry a long immediate.
+    // FIX (F10): a compare whose result goes to a BRANCH register carries no GR
+    // destination, and its destination-BR index sits in syl[4:2] -- inside the
+    // 9-bit immediate field.  The two cannot both be encoded, which used to
+    // force the assembler to burn a scratch register materialising every
+    // "cmplt $b0.0, $rA, 1".  Give that one form a narrower 6-bit signed
+    // immediate from syl[10:5], which leaves syl[4:2] free for the BR index.
+    function narrow_imm; input [6:0] op; input [5:0] dst; begin
+        narrow_imm = is_cmp(op) && (dst == 6'd0); end
+    endfunction
+
     function [31:0] op2sel;
         input [1:0] imt; input [31:0] regv; input [31:0] syl; input [31:0] ext;
+        input narrow;
     begin
         case (imt)
-            `SHORT_IMM : op2sel = {{23{syl[10]}}, syl[10:2]};   // 9-bit, signed
+            `SHORT_IMM : op2sel = narrow ? {{26{syl[10]}}, syl[10:5]}    // 6-bit
+                                         : {{23{syl[10]}}, syl[10:2]};   // 9-bit
             `BRANCH_IMM: op2sel = {20'b0, syl[16:5]};
             `LONG_IMM  : op2sel = {ext[22:0],     syl[10:2]};   // 23 + 9 = 32
             default    : op2sel = regv;
         endcase
     end endfunction
 
-    wire [31:0] a2_0 = op2sel(imt0, gr_r2_0, syl0, syl1);
-    wire [31:0] a2_1 = op2sel(imt1, gr_r2_1, syl1, syl2);
-    wire [31:0] a2_2 = op2sel(imt2, gr_r2_2, syl2, syl3);
-    wire [31:0] a2_3 = op2sel(imt3, gr_r2_3, syl3, 32'd0);
+    wire [31:0] a2_0 = op2sel(imt0, gr_r2_0, syl0, syl1,  narrow_imm(op0,dst0));
+    wire [31:0] a2_1 = op2sel(imt1, gr_r2_1, syl1, syl2,  narrow_imm(op1,dst1));
+    wire [31:0] a2_2 = op2sel(imt2, gr_r2_2, syl2, syl3,  narrow_imm(op2,dst2));
+    wire [31:0] a2_3 = op2sel(imt3, gr_r2_3, syl3, 32'd0, narrow_imm(op3,dst3));
 
     // An extension syllable is data, not an operation: it must not write back.
     // Slot 0 already gates on alu0_v and slot 3 on the memory unit's decode, but
