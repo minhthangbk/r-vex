@@ -47,10 +47,23 @@ module rvex_core (
     wire [5:0] dst0=syl0[22:17], dst1=syl1[22:17], dst2=syl2[22:17], dst3=syl3[22:17];
     wire [5:0] r1a0=syl0[16:11], r1a1=syl1[16:11], r1a2=syl2[16:11], r1a3=syl3[16:11];
     wire [5:0] r2a0=syl0[10:5],  r2a1=syl1[10:5],  r2a2=syl2[10:5];
-    wire [5:0] r2a3=syl3[22:17]; // stores read GR from the dst field
+    // FIX (F8): slot 3 hosts the memory unit, and a STORE takes the register
+    // holding the data to write from the dst field -- that is why this used to
+    // read syl3[22:17] unconditionally. But every other operation addresses its
+    // second source with syl[10:5] like slots 0-2, so an ALU op placed in slot 3
+    // used to read gr[dst] instead of gr[src2]. Select on the opcode instead.
+    wire       st3  = (op3==`MEM_STW) || (op3==`MEM_STH) || (op3==`MEM_STB);
+    wire [5:0] r2a3 = st3 ? syl3[22:17] : syl3[10:5];
     wire [2:0] dbr0=syl0[4:2],   dbr1=syl1[4:2],   dbr2=syl2[4:2],   dbr3=syl3[4:2];
     wire [2:0] sbr0=syl0[27:25], sbr1=syl1[27:25], sbr2=syl2[27:25];
-    wire [11:0] off0=syl0[16:5];
+    // Branch target for GOTO/CALL/BR/BRF: those carry no register source, so the
+    // wide 12-bit field is free.  RETURN/RFI do read a register (the link) from
+    // syl[16:11], which OVERLAPS that field -- with link=GR63 the top six offset
+    // bits were forced to 111111 and "return $r0.1 = $r0.1, 0, $l0.0" computed
+    // sp+4032.  FIX (F5): take the frame-pop offset from the standard 9-bit
+    // immediate field syl[10:2] instead, which is disjoint from the link index.
+    wire        isret0 = (op0==`CTRL_RETURN) || (op0==`CTRL_RFI);
+    wire [11:0] off0   = isret0 ? {3'b0, syl0[10:2]} : syl0[16:5];
 
     // ---- helper: is a compare/logic op that may target BR (CMPEQ..ANDL) ----
     function is_cmp; input [6:0] op; begin
@@ -69,18 +82,43 @@ module rvex_core (
     wire [31:0] gr_r1_2 = gr[r1a2], gr_r2_2 = gr[r2a2];
     wire [31:0] gr_r1_3 = gr[r1a3], gr_r2_3 = gr[r2a3];
 
-    function [31:0] op2sel; input [1:0] imt; input [31:0] regv; input [31:0] syl; begin
+    // ---- immediate operand select ----
+    // VEX defines three immediate widths (Fisher, App. A): branch offsets fit a
+    // single syllable, SHORT immediates are "9-bit for all operations", and LONG
+    // immediates are "32-bit for all operations" and "draw bits upon one adjacent
+    // extension syllable in the same cluster and instruction".
+    //
+    // FIX (F7a): the 9-bit short immediate is SIGN-extended.  It used to be
+    // zero-extended, which made the frame-allocating prologue the compiler emits
+    // -- "add $r0.1 = $r0.1, (-0x20)", see the VEX manual's own example -- read
+    // as a large positive number, so no function with a stack frame could run.
+    //
+    // FIX (F7b): LONG_IMM now decodes.  It was declared in rvex_defs.vh but had
+    // no case here, so a constant outside the short range was unencodable.  The
+    // extension syllable is the NEXT higher slot; it carries the top 23 bits and
+    // is marked with OP_SYLFOLW so it issues nothing of its own.  Slot 3 has no
+    // successor and therefore cannot carry a long immediate.
+    function [31:0] op2sel;
+        input [1:0] imt; input [31:0] regv; input [31:0] syl; input [31:0] ext;
+    begin
         case (imt)
-            `SHORT_IMM : op2sel = {23'b0, syl[10:2]};
+            `SHORT_IMM : op2sel = {{23{syl[10]}}, syl[10:2]};   // 9-bit, signed
             `BRANCH_IMM: op2sel = {20'b0, syl[16:5]};
+            `LONG_IMM  : op2sel = {ext[22:0],     syl[10:2]};   // 23 + 9 = 32
             default    : op2sel = regv;
         endcase
     end endfunction
 
-    wire [31:0] a2_0 = op2sel(imt0, gr_r2_0, syl0);
-    wire [31:0] a2_1 = op2sel(imt1, gr_r2_1, syl1);
-    wire [31:0] a2_2 = op2sel(imt2, gr_r2_2, syl2);
-    wire [31:0] a2_3 = op2sel(imt3, gr_r2_3, syl3);
+    wire [31:0] a2_0 = op2sel(imt0, gr_r2_0, syl0, syl1);
+    wire [31:0] a2_1 = op2sel(imt1, gr_r2_1, syl1, syl2);
+    wire [31:0] a2_2 = op2sel(imt2, gr_r2_2, syl2, syl3);
+    wire [31:0] a2_3 = op2sel(imt3, gr_r2_3, syl3, 32'd0);
+
+    // An extension syllable is data, not an operation: it must not write back.
+    // Slot 0 already gates on alu0_v and slot 3 on the memory unit's decode, but
+    // slots 1 and 2 write gr[dst] unconditionally, so gate all four explicitly.
+    wire ext0 = (op0 == `OP_SYLFOLW), ext1 = (op1 == `OP_SYLFOLW);
+    wire ext2 = (op2 == `OP_SYLFOLW), ext3 = (op3 == `OP_SYLFOLW);
 
     // BR operand for ALU (SLCT/SLCTF/ADDCG/DIVS use rb=syl[27:25])
     wire cin0 = br[sbr0], cin1 = br[sbr1], cin2 = br[sbr2];
@@ -100,7 +138,9 @@ module rvex_core (
     mul u_mul2(.mulop(op2),.src1(gr_r1_2),.src2(a2_2),.result(mul2_r),.overflow(mul2_o),.out_valid(mul2_v));
 
     // ---- memory unit (slot 3) ----
-    wire [9:0] dmem_byte_addr = gr_r1_3[9:0] + {1'b0, syl3[10:2]};
+    // The memory offset is the same 9-bit signed immediate field, so negative
+    // displacements ("ldw $rD = -8[$rB]") address correctly (FIX F7a).
+    wire [9:0] dmem_byte_addr = gr_r1_3[9:0] + {syl3[10], syl3[10:2]};
     wire [7:0] dmem_word_addr = dmem_byte_addr[9:2];
     wire [1:0] dmem_pos       = dmem_byte_addr[1:0];
     wire [31:0] dmem_word     = dmem[dmem_word_addr];
@@ -140,7 +180,8 @@ module rvex_core (
                     done <= 1'b1;                        // STOP
                 end else begin
                     //--------------- writeback slot 0 ---------------
-                    if (slot0_is_ctrl) begin
+                    if (ext0) ;                              // immediate extension
+                    else if (slot0_is_ctrl) begin
                         if (c_wlink && dst0 != 6'd0) gr[dst0] <= c_link;   // CALL/RETURN link
                     end else if (op0 == `ALU_MTB) begin
                         br[dbr0] <= alu0_c;
@@ -153,21 +194,24 @@ module rvex_core (
                     end
 
                     //--------------- writeback slot 1 ---------------
-                    if (op1 == `ALU_MTB) br[dbr1] <= alu1_c;
+                    if (ext1) ;                              // immediate extension
+                    else if (op1 == `ALU_MTB) br[dbr1] <= alu1_c;
                     else if (is_addcg_divs(op1)) begin
                         if (dst1 != 6'd0) gr[dst1] <= alu1_r; br[dbr1] <= alu1_c;
                     end else if (is_cmp(op1) && dst1 == 6'd0) br[dbr1] <= alu1_r[0];
                     else if (op1 != `OP_NOP && dst1 != 6'd0) gr[dst1] <= res1;
 
                     //--------------- writeback slot 2 ---------------
-                    if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
+                    if (ext2) ;                              // immediate extension
+                    else if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
                     else if (is_addcg_divs(op2)) begin
                         if (dst2 != 6'd0) gr[dst2] <= alu2_r; br[dbr2] <= alu2_c;
                     end else if (is_cmp(op2) && dst2 == 6'd0) br[dbr2] <= alu2_r[0];
                     else if (op2 != `OP_NOP && dst2 != 6'd0) gr[dst2] <= res2;
 
                     //--------------- writeback slot 3 (ALU or MEM) ---------------
-                    if (op3[6:4] == 3'b001) begin           // MEM range
+                    if (ext3) ;                              // immediate extension
+                    else if (op3[6:4] == 3'b001) begin      // MEM range
                         if (mem_is_store) dmem[dmem_word_addr] <= mem_store;
                         else if (mem_is_load && dst3 != 6'd0) gr[dst3] <= mem_load;
                         // PFT / SYL_FOLLOW -> no writeback
