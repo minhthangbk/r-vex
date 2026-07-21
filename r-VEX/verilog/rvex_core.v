@@ -104,8 +104,11 @@ module rvex_core (
     // force the assembler to burn a scratch register materialising every
     // "cmplt $b0.0, $rA, 1".  Give that one form a narrower 6-bit signed
     // immediate from syl[10:5], which leaves syl[4:2] free for the BR index.
+    // NOTE: this must be the true COMPARE range only.  is_cmp() spans
+    // CMPEQ..ANDL, which also covers NANDL/NORL/ORL/ANDL and MTB -- narrowing
+    // their immediates too would silently change what those operations read.
     function narrow_imm; input [6:0] op; input [5:0] dst; begin
-        narrow_imm = is_cmp(op) && (dst == 6'd0); end
+        narrow_imm = (op >= `ALU_CMPEQ) && (op <= `ALU_CMPNE) && (dst == 6'd0); end
     endfunction
 
     function [31:0] op2sel;
