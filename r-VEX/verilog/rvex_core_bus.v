@@ -122,10 +122,96 @@
 //     prefetching ahead during a stall (acceptable: XNOP/back-to-back-
 //     mem-access sequences are not this round's optimization target,
 //     only their correctness is).
+//
+// ROUND 26 ADDITION: `imem_stall` input (see reviews/rvex-round26-*.html).
+//   D-side caches need NO core change at all: the existing DMEM AHB-Lite
+//   port already tolerates an arbitrarily long wait for d_hreadyout
+//   (bundle_stall already freezes the whole core for however long that
+//   takes), so a D-Cache miss "just" makes d_hreadyout arrive later --
+//   exactly the LEQ-model "hardware slower than assumed" case this core
+//   was already built to handle correctly. I-side is different: IMEM was
+//   deliberately given NO ready/valid handshake in round 25 (a fixed,
+//   always-1-cycle TCM, required for genuine 1-bundle/cycle steady-state
+//   fetch throughput -- see the round-25 header above) so there was
+//   nothing an I-Cache miss could assert to make the core wait. This
+//   port is that missing signal: when high, the ENTIRE F/E pipeline
+//   freezes for exactly as long as it's asserted (same "whole pipeline
+//   holds, nothing advances" pattern as the existing XNOP/bundle_stall
+//   freezes -- see fetch_advance below, now also gated on !imem_stall),
+//   resuming the cycle it drops with imem_rdata now holding the correct
+//   (freshly cached) data. Tied to 1'b0 in round 25's own rvex_soc_top.v
+//   (unchanged, still exactly its original behavior/timing -- reverified
+//   by rerunning that round's full regression after adding this port);
+//   driven from an I-Cache's miss FSM in rvex_soc_top_cache.v.
 //======================================================================
 `include "rvex_defs.vh"
 
-module rvex_core_bus (
+module rvex_core_bus #(
+    // Reset-time squash duration (round 26): round 25's TCM (sram_sync
+    // wired directly, no ready/valid handshake) has no way to say "not
+    // ready yet" -- its internal addr_r register has NO reset, so it
+    // sits at X until the first `en` pulse, and even after that, packet0's
+    // REAL data doesn't reach packet_e until the 3rd normal-advance event
+    // (1 cycle of X-settling + the pc_f_prev/packet_e 2-deep pipe fill).
+    // squash=2'b11 at reset masks exactly that: found by hand-tracing
+    // round 25's own timing, verified by that round's regression.
+    //
+    // A cache changes this: imem_stall (see that port's header note)
+    // means normal-advance literally CANNOT happen until the I-Cache's
+    // own miss-refill handshake says the data is legitimate -- so by the
+    // time the FIRST normal-advance event fires, packet0's real data is
+    // ALREADY correctly settled (found by simulation: rvex_soc_top_cache.v
+    // was silently discarding a legitimately-arrived packet0 with the
+    // round-25 default, because the extra 2-event mask now falls on the
+    // FIRST already-valid capture instead of on genuine pre-settling
+    // garbage). Overridden to 0 by rvex_soc_top_cache.v; left at the
+    // round-25 default (and reverified via that round's own regression)
+    // for rvex_soc_top.v. The BRANCH-flush use of squash (`squash<=2'b11`
+    // on a taken branch, elsewhere in this file) is a separate, genuinely
+    // cache-independent structural property -- the pc_f_prev/packet_e
+    // pipe is always exactly 2 deep once in steady state -- and is NOT
+    // parameterized.
+    parameter [1:0] RESET_SQUASH = 2'b11,
+    // pc_e labeling source (round 26 -- found by simulation, not hand
+    // tracing: a real bug that shipped in an earlier draft and produced
+    // wrong branch targets / misattributed writebacks for an entire
+    // instruction). round 25's sram_sync gives imem_rdata a FIXED,
+    // unconditional 1-RAW-CYCLE latency (addr_r<=addr every single
+    // cycle, en tied to fetch_advance which always equals 1 event in
+    // that design) -- since round 25 never stalls, "1 cycle behind" and
+    // "1 EVENT behind" are the same thing, and pc_f_prev (which tracks
+    // pc_f exactly 1 EVENT behind) correctly labels whatever imem_rdata
+    // is showing. A cache breaks that equivalence: icache.v's idx_r
+    // resolves to represent pc_f's CURRENT value once ready (0 events
+    // behind -- pc_f is frozen at that same address for however many
+    // raw cycles the miss takes, so by the time the miss resolves,
+    // "pc_f now" and "pc_f when the miss started" are the SAME value),
+    // not "1 event behind" like pc_f_prev. Pairing packet_e (cache data,
+    // 0 events behind) with pc_e<=pc_f_prev (1 event behind) mislabels
+    // every capture by exactly one packet -- observed as: branch targets
+    // computed from the WRONG packet's decode, and an entire ALU bundle
+    // (whichever one pc_e claimed instead of the one packet_e actually
+    // held) silently never getting its writeback committed. Set to 1 by
+    // rvex_soc_top_cache.v; left 0 (pc_f_prev, round-25-original) for
+    // rvex_soc_top.v, reverified via that round's own regression.
+    parameter PC_E_FROM_PC_F = 0,
+    // Branch-flush squash duration (round 26, found by simulation as a
+    // DIRECT CONSEQUENCE of PC_E_FROM_PC_F, not a separate hand-derived
+    // decision): round 25's pipeline is genuinely 2-deep for addressing
+    // purposes (pc_f -> pc_f_prev -> pc_e/packet_e), so a taken branch
+    // always has exactly 2 already-in-flight wrong-path captures to
+    // discard. Collapsing pc_e's source to pc_f (PC_E_FROM_PC_F=1)
+    // collapses the EFFECTIVE addressing pipeline to 1-deep -- pc_f
+    // itself is what freezes-until-resolved and gets captured directly,
+    // with no intermediate stage -- so there is only ever ONE wrong-path
+    // capture in flight at branch-resolution time (whatever's currently
+    // sitting in packet_e, about to be overwritten). Using the round-25
+    // value (2'b11) here squashed the branch TARGET's own packet, not
+    // just the wrong-path one -- observed as the target bundle's
+    // writeback silently never happening even though control flow
+    // otherwise looked correct. Set to 2'b01 by rvex_soc_top_cache.v.
+    parameter [1:0] BRANCH_SQUASH = 2'b11
+) (
     input  wire clk,
     input  wire reset,
     input  wire start,
@@ -136,6 +222,7 @@ module rvex_core_bus (
     output wire [7:0]   imem_addr,
     output wire          imem_en,   // see fetch_advance below -- MUST gate real reads, not be tied high
     input  wire [127:0] imem_rdata,
+    input  wire          imem_stall, // round 26: I-Cache miss -- whole-pipeline freeze, see header
 
     // ---- DMEM: AHB-Lite master ----
     output wire [7:0]   d_haddr,
@@ -183,6 +270,28 @@ module rvex_core_bus (
     // cycle later than the naive version.
     localparam DM_IDLE = 2'd0, DM_WAIT1 = 2'd1, DM_RMW_ISSUE = 2'd2, DM_WAIT2 = 2'd3;
     reg [1:0]  dm_state;
+    // Round 26: prevents a real race found by simulation (tb_soc_top_cache.v's
+    // D-Cache eviction test) -- issue1's condition (dm_state==DM_IDLE &&
+    // want_mem) becomes true again the INSTANT a bundle's own transaction
+    // completes and dm_state cycles back to IDLE, using packet_e_eff's
+    // STILL-current (not yet superseded) content. In round 25 this always
+    // coincided with normal-advance ALSO being ready to fire that same
+    // cycle (bundle_stall clearing was the only gate), so the bundle got
+    // superseded before the spurious reissue could matter -- wasted a
+    // cycle re-fetching the SAME address, invisible to round 25's tests
+    // since the value doesn't change. Round 26 breaks that coincidence:
+    // imem_stall can independently keep normal-advance blocked for
+    // several MORE cycles after bundle_stall clears, during which
+    // issue1 keeps re-evaluating true and re-issues the SAME bundle's
+    // transaction again -- and because that spurious transaction makes
+    // the bus busy again right as normal-advance FINALLY does fire, it
+    // delays the NEXT bundle's own legitimate transaction. mem_issued
+    // latches "this bundle already issued its transaction once"; issue1
+    // is gated by !mem_issued; the flag resets to 0 the cycle normal-
+    // advance actually captures a new bundle (see mem_issued's two write
+    // sites below -- both live in the SAME always block as each other
+    // and as load_complete_now, for the same multi-driver reason).
+    reg        mem_issued;
     reg        pend_is_load, pend_is_rmw;
     reg [5:0]  pend_dst;
     reg [6:0]  pend_op3;
@@ -335,6 +444,20 @@ module rvex_core_bus (
     // Gating `en` by fetch_advance holds the SRAM's address register
     // stable for the whole freeze, so the in-flight fetch is exactly
     // where packet_e finds it once unfrozen.
+    //
+    // Deliberately NOT gated by `imem_stall` (round 26): imem_stall is an
+    // INPUT computed by the I-Cache from imem_addr/imem_en themselves --
+    // making imem_en depend on imem_stall would be a real combinational
+    // loop (imem_en -> cache's hit/miss decision -> imem_stall -> imem_en),
+    // not just a bad-practice one. Caught by re-deriving this by hand
+    // before writing the cache, not by simulation. Instead: imem_en stays
+    // high (re-presenting the SAME, frozen pc_f address) for the whole
+    // duration of an I-Cache miss, which is safe as long as the cache
+    // itself ignores repeated en-pulses for an address it's already
+    // servicing (see icache.v's `miss_active` gating on `new_miss`) --
+    // the actual freeze (packet_e/pc_f not advancing) is enforced by
+    // imem_stall gating the main sequencer's "normal advance" branch
+    // below instead, which has no such loop risk.
     wire fetch_advance = running && !done && (stall_cnt==0) && !slot0_is_stop && !bundle_stall;
     assign imem_en = fetch_advance;
 
@@ -351,8 +474,8 @@ module rvex_core_bus (
     // by hand cycle-by-cycle before trusting it; see tb_soc_top.v's
     // load-use directed test, which checks BOTH the 0-bubble (must read
     // stale) and 1-bubble (must read fresh) cases explicitly.
-    wire issue1 = running && !done && stall_cnt==0 && !slot0_is_stop
-                  && want_mem && (dm_state == DM_IDLE);
+    wire issue1 = running && !done && stall_cnt==0 && !slot0_is_stop && !imem_stall
+                  && want_mem && (dm_state == DM_IDLE) && !mem_issued;
     // RMW's write-phase address is driven for exactly the DM_RMW_ISSUE
     // cycle -- see that state's declaration above for why this can't just
     // be folded into the DM_WAIT1->DM_WAIT2 edge. d_hrdata is still valid
@@ -406,7 +529,8 @@ module rvex_core_bus (
     always @(posedge clk) begin
         if (reset) begin
             pc_f <= 8'd0; pc_f_prev <= 8'd0; packet_e <= 128'd0; pc_e <= 8'd0;
-            squash <= 2'b11; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
+            squash <= RESET_SQUASH; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
+            mem_issued <= 1'b0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
         end else begin
@@ -422,6 +546,14 @@ module rvex_core_bus (
             // load_complete_now's declaration above for why this write
             // lives here instead of in the DMEM sub-FSM's always block.
             if (load_complete_now) gr[pend_dst] <= mem_load_c;
+            // Set here (top-level, same pattern as load_complete_now above)
+            // so it applies regardless of which branch below executes this
+            // cycle; the normal-advance branch's own `mem_issued <= 1'b0`
+            // (new-bundle reset) is textually LATER in this same always
+            // block, so it correctly wins on any cycle both conditions
+            // coincide (issue1 firing for the outgoing bundle at the exact
+            // edge normal-advance also supersedes it with a new one).
+            if (issue1) mem_issued <= 1'b1;
             if (running && !done) begin
                 cycles <= cycles + 1;
                 if (stall_cnt != 0) begin
@@ -430,11 +562,16 @@ module rvex_core_bus (
                     done <= 1'b1;
                 end else if (bundle_stall) begin
                     ; // waiting for the DMEM bus to free up; F/E pipeline frozen, DM sub-FSM above still runs
+                end else if (imem_stall) begin
+                    ; // I-Cache miss (round 26): whole pipeline frozen, same shape as bundle_stall above;
+                      // load_complete_now above is unaffected -- a D-side transaction may keep completing
+                      // independently, since it's on a physically separate AXI port from the I-Cache miss
                 end else begin
                     // ---- fetch pipeline advance (always runs a cycle ahead) ----
                     pc_f_prev <= pc_f;
                     packet_e  <= imem_rdata;
-                    pc_e      <= pc_f_prev;
+                    pc_e      <= PC_E_FROM_PC_F ? pc_f : pc_f_prev;
+                    mem_issued <= 1'b0; // new bundle incoming, hasn't issued anything yet
                     if (squash != 2'b00) squash <= squash >> 1;
 
                     //--------------- writeback slot 0 ---------------
@@ -482,7 +619,7 @@ module rvex_core_bus (
                         pc_f <= pc_f + 8'd1;
                     end else if (slot0_is_ctrl && c_taken) begin
                         pc_f   <= c_pc_goto;
-                        squash <= 2'b11;                      // flush the 2 already-in-flight wrong-path fetches
+                        squash <= BRANCH_SQUASH;                // flush already-in-flight wrong-path fetch(es)
                     end else begin
                         pc_f <= pc_f + 8'd1;
                     end

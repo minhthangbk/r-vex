@@ -33,9 +33,14 @@ module rvex_soc_top (
     wire [31:0] d_hrdata;
     wire        d_hreadyout;
 
+    // imem_stall tied low: this integration has no I-Cache (round 26 added
+    // that port to rvex_core_bus.v for rvex_soc_top_cache.v's benefit) --
+    // tying it low reproduces round 25's exact original behavior/timing,
+    // reverified by rerunning this round's full regression unchanged.
     rvex_core_bus u_core (
         .clk(clk), .reset(reset), .start(start), .done(done), .cycles(cycles),
         .imem_addr(imem_addr), .imem_en(imem_en), .imem_rdata(imem_rdata),
+        .imem_stall(1'b0),
         .d_haddr(d_haddr), .d_hwrite(d_hwrite), .d_htrans(d_htrans),
         .d_hwdata(d_hwdata), .d_hrdata(d_hrdata), .d_hreadyout(d_hreadyout)
     );
