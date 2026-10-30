@@ -47,7 +47,10 @@ module rvex_core (
     wire [5:0] dst0=syl0[22:17], dst1=syl1[22:17], dst2=syl2[22:17], dst3=syl3[22:17];
     wire [5:0] r1a0=syl0[16:11], r1a1=syl1[16:11], r1a2=syl2[16:11], r1a3=syl3[16:11];
     wire [5:0] r2a0=syl0[10:5],  r2a1=syl1[10:5],  r2a2=syl2[10:5];
-    wire [5:0] r2a3=syl3[22:17]; // stores read GR from the dst field
+    // Stores read the data GR from the dst field; every other slot-3 op
+    // (ALU, load) reads src2 from [10:5] like the other slots.
+    wire       st3 = (op3 == `MEM_STW) || (op3 == `MEM_STH) || (op3 == `MEM_STB);
+    wire [5:0] r2a3 = st3 ? syl3[22:17] : syl3[10:5];
     wire [2:0] dbr0=syl0[4:2],   dbr1=syl1[4:2],   dbr2=syl2[4:2],   dbr3=syl3[4:2];
     wire [2:0] sbr0=syl0[27:25], sbr1=syl1[27:25], sbr2=syl2[27:25];
     wire [11:0] off0=syl0[16:5];
@@ -113,7 +116,9 @@ module rvex_core (
     wire [7:0]  c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
     wire [11:0] c_xnop_n;
     wire c_br_in = br[syl0[4:2]]; // BR/BRF read rb = syl[4:2]
-    ctrl_unit u_ctrl(.opcode(op0),.pc(pc),.lr(gr_r1_0),.sp(gr[1]),.offset(off0),.br(c_br_in),
+    // The link register is implicit ($l0.0 = GR63), as in VEX: syl[16:5] is
+    // the offset of return/rfi (SP + offset), so it cannot also name a GR.
+    ctrl_unit u_ctrl(.opcode(op0),.pc(pc),.lr(gr[63]),.sp(gr[1]),.offset(off0),.br(c_br_in),
                      .pc_goto(c_pc_goto),.link_val(c_link),.taken(c_taken),.writes_link(c_wlink),
                      .is_xnop(c_xnop),.xnop_n(c_xnop_n),.is_rfi(c_rfi),.out_valid(c_v));
 
