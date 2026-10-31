@@ -16,6 +16,7 @@
 #   tb_codex_stall external-port hold contract (I/D miss, XNOP, carry, STOP)
 #   tb_piu        performance indicator unit, bare core (reviews/contracts/piu.md)
 #   tb_piu_sys    PIU in rvex_system: misses, hw_sem, per-core PIUs
+#   tb_cmpbr      compare to BR with an immediate (reviews/contracts/cmpbr.md)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds)
 #   tb_hw_sem     constrained-random hardware semaphores (4 seeds)
 set -e
@@ -53,6 +54,14 @@ run tb_codex_piu_core    "$CORE"                               tb_codex_piu_core
 run tb_codex_piu_dualctrl "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_piu_dualctrl.v
 run tb_codex_piu_r11     "$CORE"                               tb_codex_piu_r11.v
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v
+run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldbr.v
+run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v
+# compare to BR with an immediate (reviews/contracts/cmpbr.md), 3 seeds
+iverilog -g2012 -I . -o tb_cmpbr.vvp $CORE tb_cmpbr.v
+for seed in 1 2 3; do
+    echo "### Running  tb_cmpbr seed $seed ###" | tee -a "$LOG"
+    vvp tb_cmpbr.vvp +SEED=$seed | tee -a "$LOG"
+done
 # MSI coherence: 2 x L1D + atomic snooping bus + L2, random traffic, 4 seeds
 iverilog -g2012 -I . -o tb_coherence.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
 for seed in 1 2 3 4; do

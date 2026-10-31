@@ -113,18 +113,30 @@ module rvex_core #(
     wire [31:0] gr_r1_2 = gr[r1a2], gr_r2_2 = gr[r2a2];
     wire [31:0] gr_r1_3 = gr[r1a3], gr_r2_3 = gr[r2a3];
 
-    function [31:0] op2sel; input [1:0] imt; input [31:0] regv; input [31:0] syl; begin
+    // BRIMM (reviews/contracts/cmpbr.md): a compare/logic op with imm type
+    // 2'b11 writes BR syl[19:17] = GR syl[16:11] <op> zext(syl[10:2]) and no
+    // GR. A BR compare leaves the GR dst field free, so the BR index moves
+    // there and syl[10:2] holds the immediate as for SHORT_IMM.
+    function is_brimm; input [6:0] op; input [1:0] imt; begin
+        is_brimm = (imt == `LONG_IMM) &&
+                   (((op >= `ALU_CMPEQ) && (op <= `ALU_NORL)) || op == `ALU_ORL || op == `ALU_ANDL); end
+    endfunction
+    wire bi0 = is_brimm(op0, imt0), bi1 = is_brimm(op1, imt1),
+         bi2 = is_brimm(op2, imt2), bi3 = is_brimm(op3, imt3);
+
+    function [31:0] op2sel; input [1:0] imt; input bi; input [31:0] regv; input [31:0] syl; begin
         case (imt)
             `SHORT_IMM : op2sel = {23'b0, syl[10:2]};
             `BRANCH_IMM: op2sel = {20'b0, syl[16:5]};
+            `LONG_IMM  : op2sel = bi ? {23'b0, syl[10:2]} : regv;
             default    : op2sel = regv;
         endcase
     end endfunction
 
-    wire [31:0] a2_0 = op2sel(imt0, gr_r2_0, syl0);
-    wire [31:0] a2_1 = op2sel(imt1, gr_r2_1, syl1);
-    wire [31:0] a2_2 = op2sel(imt2, gr_r2_2, syl2);
-    wire [31:0] a2_3 = op2sel(imt3, gr_r2_3, syl3);
+    wire [31:0] a2_0 = op2sel(imt0, bi0, gr_r2_0, syl0);
+    wire [31:0] a2_1 = op2sel(imt1, bi1, gr_r2_1, syl1);
+    wire [31:0] a2_2 = op2sel(imt2, bi2, gr_r2_2, syl2);
+    wire [31:0] a2_3 = op2sel(imt3, bi3, gr_r2_3, syl3);
 
     // BR operand for ALU (SLCT/SLCTF/ADDCG/DIVS use rb=syl[27:25])
     wire cin0 = br[sbr0], cin1 = br[sbr1], cin2 = br[sbr2];
@@ -224,6 +236,8 @@ module rvex_core #(
                         if (c_wlink && dst0 != 6'd0) gr[dst0] <= c_link;   // CALL/RETURN link
                     end else if (op0 == `ALU_MTB) begin
                         br[dbr0] <= alu0_c;
+                    end else if (bi0) begin
+                        br[syl0[19:17]] <= alu0_r[0];
                     end else if (is_addcg_divs(op0)) begin
                         if (dst0 != 6'd0) gr[dst0] <= alu0_r; br[dbr0] <= alu0_c;
                     end else if (is_cmp(op0) && dst0 == 6'd0) begin
@@ -234,6 +248,7 @@ module rvex_core #(
 
                     //--------------- writeback slot 1 ---------------
                     if (op1 == `ALU_MTB) br[dbr1] <= alu1_c;
+                    else if (bi1) br[syl1[19:17]] <= alu1_r[0];
                     else if (is_addcg_divs(op1)) begin
                         if (dst1 != 6'd0) gr[dst1] <= alu1_r; br[dbr1] <= alu1_c;
                     end else if (is_cmp(op1) && dst1 == 6'd0) br[dbr1] <= alu1_r[0];
@@ -241,6 +256,7 @@ module rvex_core #(
 
                     //--------------- writeback slot 2 ---------------
                     if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
+                    else if (bi2) br[syl2[19:17]] <= alu2_r[0];
                     else if (is_addcg_divs(op2)) begin
                         if (dst2 != 6'd0) gr[dst2] <= alu2_r; br[dbr2] <= alu2_c;
                     end else if (is_cmp(op2) && dst2 == 6'd0) br[dbr2] <= alu2_r[0];
@@ -252,6 +268,7 @@ module rvex_core #(
                         else if (mem_is_load && dst3 != 6'd0) gr[dst3] <= mem_load;
                         // PFT / SYL_FOLLOW -> no writeback
                     end else if (op3 == `ALU_MTB) br[dbr3] <= alu3_c;
+                    else if (bi3) br[syl3[19:17]] <= alu3_r[0];
                     else if (is_addcg_divs(op3)) begin
                         if (dst3 != 6'd0) gr[dst3] <= alu3_r; br[dbr3] <= alu3_c;
                     end else if (is_cmp(op3) && dst3 == 6'd0) br[dbr3] <= alu3_r[0];
