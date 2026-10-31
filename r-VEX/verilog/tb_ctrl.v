@@ -27,7 +27,7 @@ module tb_ctrl;
     wire        taken, writes_link, is_xnop, is_rfi, out_valid;
     wire [11:0] xnop_n;
 
-    ctrl_unit u_ctrl(.opcode(op),.pc(pc),.lr(lr),.sp(sp),.offset(offset),.br(br),
+    ctrl_unit #(.PC_W(8)) u_ctrl(.opcode(op),.pc(pc),.lr(lr),.sp(sp),.offset(offset),.br(br),
                      .pc_goto(pc_goto),.link_val(link_val),.taken(taken),
                      .writes_link(writes_link),.is_xnop(is_xnop),.xnop_n(xnop_n),
                      .is_rfi(is_rfi),.out_valid(out_valid));

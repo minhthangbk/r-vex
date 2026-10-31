@@ -14,28 +14,61 @@
 //
 //   GR file is 64 deep (6-bit addresses) so $r0.63-style link regs are legal;
 //   the VHDL constant GR_DEPTH=32 was a latent limitation. GR[0] is hardwired 0.
+//
+// MEMORY SYSTEM (2026-10-31):
+//   PC_W     : PC width. 12 = the whole absolute branch field syl[16:5], so
+//              imem holds 2**PC_W packets (was 8 bits / 256 packets).
+//   DMEM_AW  : byte-address width of the internal data memory (was 10).
+//   EXT_DMEM : 0 = internal single-cycle dmem (default, used by every
+//              existing testbench). 1 = slot-3 loads/stores go out on the
+//              d_* port (to an L1 D-cache). The port is combinational: on
+//              d_ready the access completes in this cycle; without it the
+//              WHOLE packet is held (no GR/BR/PC/memory update), i.e. the
+//              core stalls on a cache miss and the compiler-visible
+//              schedule is unchanged.
+//   EXT_IMEM : 1 = packets come from the i_* port (an L1 I-cache); a fetch
+//              miss holds the core the same way.
 //======================================================================
 `include "rvex_defs.vh"
 
-module rvex_core (
+module rvex_core #(
+    parameter PC_W     = 12,
+    parameter DMEM_AW  = 16,
+    parameter EXT_DMEM = 0,
+    parameter EXT_IMEM = 0
+) (
     input  wire clk,
     input  wire reset,
     input  wire start,
     output reg  done,
-    output reg [31:0] cycles
+    output reg [31:0] cycles,
+    // external data port (EXT_DMEM=1)
+    output wire        d_req,
+    output wire        d_we,
+    output wire [31:0] d_addr,     // byte address, word aligned
+    output wire [31:0] d_wdata,    // whole merged word (sub-word stores)
+    input  wire [31:0] d_rdata,
+    input  wire        d_ready,
+    output reg  [31:0] stall_cycles,     // cycles held by D-side misses
+    // external instruction port (EXT_IMEM=1, to an L1 I-cache)
+    output wire              i_req,
+    output wire [PC_W-1:0]   i_addr,
+    input  wire [127:0]      i_rdata,
+    input  wire              i_ready,
+    output reg  [31:0]       istall_cycles  // cycles held by I-side misses
 );
     // ---- state ----
-    reg [127:0] imem [0:255];      // instruction memory (4 syllables per packet)
+    reg [127:0] imem [0:(1<<PC_W)-1];      // instruction memory (4 syllables per packet)
     reg [31:0]  gr   [0:63];       // general registers ($r0.0 = 0)
     reg         br   [0:7];        // branch registers
-    reg [31:0]  dmem [0:255];      // data memory (word addressed)
-    reg [7:0]   pc;
+    reg [31:0]  dmem [0:(1<<(DMEM_AW-2))-1]; // data memory (word addressed)
+    reg [PC_W-1:0] pc;
     reg [11:0]  stall_cnt;
     reg         running;
     integer     i;
 
     // ---- current packet & syllables ----
-    wire [127:0] packet = imem[pc];
+    wire [127:0] packet = EXT_IMEM ? i_rdata : imem[pc];
     wire [31:0]  syl0 = packet[31:0];
     wire [31:0]  syl1 = packet[63:32];
     wire [31:0]  syl2 = packet[95:64];
@@ -103,22 +136,23 @@ module rvex_core (
     mul u_mul2(.mulop(op2),.src1(gr_r1_2),.src2(a2_2),.result(mul2_r),.overflow(mul2_o),.out_valid(mul2_v));
 
     // ---- memory unit (slot 3) ----
-    wire [9:0] dmem_byte_addr = gr_r1_3[9:0] + {1'b0, syl3[10:2]};
-    wire [7:0] dmem_word_addr = dmem_byte_addr[9:2];
-    wire [1:0] dmem_pos       = dmem_byte_addr[1:0];
-    wire [31:0] dmem_word     = dmem[dmem_word_addr];
+    wire [31:0] mem_ea        = gr_r1_3 + {23'b0, syl3[10:2]};
+    wire [DMEM_AW-1:0] dmem_byte_addr = mem_ea[DMEM_AW-1:0];
+    wire [DMEM_AW-3:0] dmem_word_addr = dmem_byte_addr[DMEM_AW-1:2];
+    wire [1:0] dmem_pos       = mem_ea[1:0];
+    wire [31:0] dmem_word     = EXT_DMEM ? d_rdata : dmem[dmem_word_addr];
     wire [31:0] mem_load, mem_store; wire mem_is_load, mem_is_store, mem_v;
     mem_unit u_mem(.opcode(op3),.mem_val(dmem_word),.reg_val(gr_r2_3),.pos(dmem_pos),
                    .load_data(mem_load),.store_data(mem_store),
                    .is_load(mem_is_load),.is_store(mem_is_store),.out_valid(mem_v));
 
     // ---- control unit (slot 0) ----
-    wire [7:0]  c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
+    wire [PC_W-1:0] c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
     wire [11:0] c_xnop_n;
     wire c_br_in = br[syl0[4:2]]; // BR/BRF read rb = syl[4:2]
     // The link register is implicit ($l0.0 = GR63), as in VEX: syl[16:5] is
     // the offset of return/rfi (SP + offset), so it cannot also name a GR.
-    ctrl_unit u_ctrl(.opcode(op0),.pc(pc),.lr(gr[63]),.sp(gr[1]),.offset(off0),.br(c_br_in),
+    ctrl_unit #(.PC_W(PC_W)) u_ctrl(.opcode(op0),.pc(pc),.lr(gr[63]),.sp(gr[1]),.offset(off0),.br(c_br_in),
                      .pc_goto(c_pc_goto),.link_val(c_link),.taken(c_taken),.writes_link(c_wlink),
                      .is_xnop(c_xnop),.xnop_n(c_xnop_n),.is_rfi(c_rfi),.out_valid(c_v));
 
@@ -129,10 +163,23 @@ module rvex_core (
     wire [31:0] res1 = is_mul(op1) ? mul1_r : alu1_r;
     wire [31:0] res2 = is_mul(op2) ? mul2_r : alu2_r;
 
+    // ---- external data port / miss stall ----
+    assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
+    assign i_addr  = pc;
+    wire   fstall  = i_req && !i_ready;          // packet not fetched yet
+    wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop;
+    wire mem_acc = (op3[6:4] == 3'b001) && (mem_is_load || mem_is_store);
+    assign d_req   = EXT_DMEM && issue && mem_acc;
+    assign d_we    = mem_is_store;
+    assign d_addr  = {mem_ea[31:2], 2'b00};
+    assign d_wdata = mem_store;
+    wire   dstall  = d_req && !d_ready;
+
     // ================= sequential execution =================
     always @(posedge clk) begin
         if (reset) begin
-            pc <= 8'd0; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
+            pc <= {PC_W{1'b0}}; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
+            stall_cycles <= 32'd0; istall_cycles <= 32'd0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
         end else begin
@@ -141,6 +188,10 @@ module rvex_core (
                 cycles <= cycles + 1;
                 if (stall_cnt != 0) begin
                     stall_cnt <= stall_cnt - 1;         // XNOP bubble
+                end else if (fstall) begin
+                    istall_cycles <= istall_cycles + 1;  // I-cache miss: no packet yet
+                end else if (dstall) begin
+                    stall_cycles <= stall_cycles + 1;    // D-cache miss: hold the packet
                 end else if (slot0_is_stop) begin
                     done <= 1'b1;                        // STOP
                 end else begin
@@ -173,7 +224,7 @@ module rvex_core (
 
                     //--------------- writeback slot 3 (ALU or MEM) ---------------
                     if (op3[6:4] == 3'b001) begin           // MEM range
-                        if (mem_is_store) dmem[dmem_word_addr] <= mem_store;
+                        if (mem_is_store && !EXT_DMEM) dmem[dmem_word_addr] <= mem_store;
                         else if (mem_is_load && dst3 != 6'd0) gr[dst3] <= mem_load;
                         // PFT / SYL_FOLLOW -> no writeback
                     end else if (op3 == `ALU_MTB) br[dbr3] <= alu3_c;
@@ -185,11 +236,11 @@ module rvex_core (
                     //--------------- PC / stall update ---------------
                     if (slot0_is_ctrl && c_xnop) begin
                         stall_cnt <= c_xnop_n;              // NEW: XNOP stall n cycles
-                        pc <= pc + 8'd1;
+                        pc <= pc + 1'b1;
                     end else if (slot0_is_ctrl && c_taken) begin
                         pc <= c_pc_goto;                    // branch / call / return
                     end else begin
-                        pc <= pc + 8'd1;
+                        pc <= pc + 1'b1;
                     end
                 end
             end

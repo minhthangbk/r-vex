@@ -311,6 +311,27 @@ CORE PROG #3: 10 passed, 0 failed
 RESULT: CORE PROGRAM #3 PASSED
 tb_core_carry.v:125: $finish called at 175000 (1ps)
 
+### Building tb_codex_stall ###
+### Running  tb_codex_stall ###
+RESULT: CODEX STALL TEST PASSED
+tb_codex_stall.v:105: $finish called at 146000 (1ps)
+
+### Running  tb_coherence seed 1 ###
+COHERENCE seed=1 cycles=50000 loads=1707 stores=1744 bus_txn=4015 c2c=361 l1miss=1313/1329 upgr=102/99 wb=593/579 inval=163/191 l2hit=1958 l2miss=1856 l2wb=1115 errors=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:151: $finish called at 500026000 (1ps)
+### Running  tb_coherence seed 2 ###
+COHERENCE seed=2 cycles=50000 loads=1688 stores=1688 bus_txn=3986 c2c=373 l1miss=1325/1326 upgr=96/96 wb=572/571 inval=176/185 l2hit=1930 l2miss=1863 l2wb=1140 errors=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:151: $finish called at 500026000 (1ps)
+### Running  tb_coherence seed 3 ###
+COHERENCE seed=3 cycles=50000 loads=1746 stores=1706 bus_txn=4007 c2c=379 l1miss=1341/1356 upgr=98/79 wb=564/569 inval=190/189 l2hit=1958 l2miss=1871 l2wb=1100 errors=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:151: $finish called at 500026000 (1ps)
+### Running  tb_coherence seed 4 ###
+COHERENCE seed=4 cycles=50000 loads=1774 stores=1648 bus_txn=3974 c2c=314 l1miss=1306/1324 upgr=101/90 wb=580/573 inval=160/170 l2hit=1871 l2miss=1912 l2wb=1113 errors=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:151: $finish called at 500026000 (1ps)
 ================= SUITE SUMMARY =================
 RESULT: ALL UNIT TESTS PASSED
 RESULT: ALL ALU FULL TESTS PASSED
@@ -322,4 +343,9 @@ RESULT: MUL RANDOM PASSED
 RESULT: CORE TEST PASSED
 RESULT: CORE PROGRAM #2 PASSED
 RESULT: CORE PROGRAM #3 PASSED
+RESULT: CODEX STALL TEST PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
 OVERALL: ALL SUITES PASSED

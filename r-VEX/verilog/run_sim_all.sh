@@ -13,6 +13,8 @@
 #   tb_core       original integrated core program
 #   tb_core_prog  2nd core program (branch/CALL/RETURN/SLCT/VLIW)
 #   tb_core_carry 3rd core program (ADDCG carry-chain + STH/STB->load)
+#   tb_codex_stall external-port hold contract (I/D miss, XNOP, carry, STOP)
+#   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds)
 set -e
 export PATH="/f/APPs/iverilog/bin:$PATH"
 cd "$(dirname "$0")"
@@ -40,6 +42,13 @@ run tb_mul_rand   "rvex_defs.vh mul.v"                        tb_mul_rand.v
 run tb_core       "$CORE"                                     tb_core.v
 run tb_core_prog  "$CORE"                                     tb_core_prog.v
 run tb_core_carry "$CORE"                                     tb_core_carry.v
+run tb_codex_stall "$CORE"                                     tb_codex_stall.v
+# MSI coherence: 2 x L1D + atomic snooping bus + L2, random traffic, 4 seeds
+iverilog -g2012 -I . -o tb_coherence.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+for seed in 1 2 3 4; do
+    echo "### Running  tb_coherence seed $seed ###" | tee -a "$LOG"
+    vvp tb_coherence.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+done
 
 echo "================= SUITE SUMMARY =================" | tee -a "$LOG"
 grep -E 'RESULT:' "$LOG" | tee -a "$LOG"
