@@ -51,7 +51,11 @@ module l1d_cache #(
 );
     localparam OP_RD = 2'd0, OP_RDX = 2'd1, OP_UPGR = 2'd2, OP_WB = 2'd3;
     localparam ST_I = 2'd0, ST_S = 2'd1, ST_M = 2'd2;
-    localparam IW = $clog2(SETS);
+    localparam IW = (SETS > 1) ? $clog2(SETS) : 1;
+    // SETS must be a power of two >= 2 (a 1-line cache has no index bits)
+    initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
+        $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
+    end
     localparam TW = AW - 4 - IW;
 
     reg [1:0]    st  [0:SETS-1];

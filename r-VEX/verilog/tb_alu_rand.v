@@ -23,14 +23,14 @@ module tb_alu_rand;
               .result(ares),.cout(acout),.out_valid(aval));
 
     // ---- opcode table (44 entries incl. 2 invalid) ----
-    localparam integer NOPS = 44;
+    localparam integer NOPS = 45;
     reg [6:0] optab [0:NOPS-1];
 
     // ---- independent behavioural reference ----
     task alu_ref;
         input  [6:0] op; input [31:0] s1,s2; input c;
         output [31:0] r; output rc; output rv;
-        reg [4:0]  sh; reg [32:0] add33; reg [31:0] dshift;
+        reg [4:0]  sh; reg [32:0] add33; reg [31:0] dshift; reg [31:0] t;
         begin
             r=32'd0; rc=1'b0; rv=1'b1; sh=s2[4:0];
             if (op[6:3]==`ALU_ADDCG4) begin
@@ -80,6 +80,10 @@ module tb_alu_rand;
                 `ALU_ORL   : r = ((s1==0)&&(s2==0)) ? 32'd0 : 32'd1;
                 `ALU_ANDL  : r = ((s1==0)||(s2==0)) ? 32'd0 : 32'd1;
                 `ALU_MTB   : begin r = 32'd0; rc = s1[0]; end
+                `ALU_CLZ   : begin r = 32'd0;              // independent model: shift until the MSB is 1
+                                 if (s1 == 0) r = 32'd32;
+                                 else begin t = s1; while (!t[31]) begin t = t << 1; r = r + 1; end end
+                             end
                 default    : begin r = 32'd0; rv = 1'b0; end
             endcase
         end
@@ -99,6 +103,7 @@ module tb_alu_rand;
         optab[36]=`ALU_MTB;  optab[37]=`ALU_ANDL; optab[38]=`ALU_ADDCG;optab[39]=`ALU_DIVS;
         optab[40]=`ALU_SLCT; optab[41]=`ALU_SLCTF;
         optab[42]=`OP_STOP;  optab[43]=`OP_SEND;   // invalid -> out_valid must be 0
+        optab[44]=`ALU_CLZ;
 
         seed = 32'h1234_5678;
         $display("========= r-VEX ALU constrained-random (%0d vectors) =========", N);
@@ -108,6 +113,7 @@ module tb_alu_rand;
             as1  = $random(seed);
             as2  = $random(seed);
             acin = $random(seed);
+            if (aop == `ALU_CLZ) as1 = ({$random(seed)} % 8 == 0) ? 32'd0 : as1 >> ({$random(seed)} % 32);
             #1;
             alu_ref(aop, as1, as2, acin, xr, xc, xv);
             checks = checks + 3;

@@ -8,6 +8,7 @@
 //   - MTB moves s1[0] onto cout (BR write)
 //   - ADDCG / DIVS produce a carry-out on cout
 //   - SLCT/SLCTF select on cin (branch operand b)
+//   - CLZ (new, not in the VHDL) counts the leading zeros of src1 (32 for 0)
 // out_valid = 0 for an unknown opcode (mirrors the VHDL fall-through).
 //======================================================================
 `include "rvex_defs.vh"
@@ -25,6 +26,17 @@ module alu (
     reg  [32:0] addcg;
     // division-step temporaries (mirror f_DIVS)
     reg  [31:0] divs_shift;
+
+    function [31:0] clz32;
+        input [31:0] x;
+        integer k;
+        reg found;
+        begin
+            clz32 = 32'd32; found = 1'b0;
+            for (k = 31; k >= 0; k = k - 1)
+                if (!found && x[k]) begin clz32 = 31 - k; found = 1'b1; end
+        end
+    endfunction
 
     always @(*) begin
         result    = 32'd0;
@@ -87,6 +99,7 @@ module alu (
                 `ALU_ORL   : result = ((src1 == 0) && (src2 == 0)) ? 32'd0 : 32'd1;
                 `ALU_ANDL  : result = ((src1 == 0) || (src2 == 0)) ? 32'd0 : 32'd1;
                 `ALU_MTB   : begin result = 32'd0; cout = src1[0]; end
+                `ALU_CLZ   : result = clz32(src1);
                 default    : begin result = 32'd0; out_valid = 1'b0; end
             endcase
         end

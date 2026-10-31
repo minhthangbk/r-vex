@@ -19,7 +19,14 @@ module l1i_cache #(
     output wire [127:0]    i_rdata,
     output wire            i_ready
 );
-    localparam IW = $clog2(SETS);
+    localparam IW = (SETS > 1) ? $clog2(SETS) : 1;
+    initial if (FILL_LAT < 1) begin   // cnt <= LAT-1 would wrap to 65535
+        $display("FATAL %m: FILL_LAT=%0d must be >= 1", FILL_LAT); $finish;
+    end
+    // SETS must be a power of two >= 2 (a 1-line cache has no index bits)
+    initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
+        $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
+    end
     localparam TW = PC_W - 2 - IW;
 
     reg [127:0]  rom [0:(1<<PC_W)-1];

@@ -25,7 +25,17 @@ module l2_cache #(
     output reg           done,         // 1-cycle pulse
     output reg  [127:0]  rline
 );
-    localparam IW = $clog2(SETS);
+    localparam IW = (SETS > 1) ? $clog2(SETS) : 1;
+    initial if (L2_LAT < 1) begin   // cnt <= LAT-1 would wrap to 65535
+        $display("FATAL %m: L2_LAT=%0d must be >= 1", L2_LAT); $finish;
+    end
+    initial if (MEM_LAT < 1) begin   // cnt <= LAT-1 would wrap to 65535
+        $display("FATAL %m: MEM_LAT=%0d must be >= 1", MEM_LAT); $finish;
+    end
+    // SETS must be a power of two >= 2 (a 1-line cache has no index bits)
+    initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
+        $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
+    end
     localparam TW = AW - 4 - IW;
 
     reg [31:0]   mem [0:(1<<(AW-2))-1];

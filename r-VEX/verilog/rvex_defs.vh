@@ -73,6 +73,7 @@
 `define ALU_CMPNE   7'b1100010
 `define ALU_NANDL   7'b1100011
 `define ALU_NORL    7'b1100100
+`define ALU_CLZ     7'b1100101   // 2026-10-31: count leading zeros (free opcode)
 `define ALU_ORL     7'b1100110
 `define ALU_MTB     7'b1100111
 `define ALU_ANDL    7'b1101000

@@ -47,6 +47,7 @@ module rvex_core #(
     output wire        d_we,
     output wire [31:0] d_addr,     // byte address, word aligned
     output wire [31:0] d_wdata,    // whole merged word (sub-word stores)
+    output wire        d_word,     // the access is ldw/stw (hw_sem accepts only these)
     input  wire [31:0] d_rdata,
     input  wire        d_ready,
     output reg  [31:0] stall_cycles,     // cycles held by D-side misses
@@ -173,6 +174,7 @@ module rvex_core #(
     assign d_we    = mem_is_store;
     assign d_addr  = {mem_ea[31:2], 2'b00};
     assign d_wdata = mem_store;
+    assign d_word  = (op3 == `MEM_LDW) || (op3 == `MEM_STW);
     wire   dstall  = d_req && !d_ready;
 
     // ================= sequential execution =================

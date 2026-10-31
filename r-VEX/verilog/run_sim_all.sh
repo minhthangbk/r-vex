@@ -15,6 +15,7 @@
 #   tb_core_carry 3rd core program (ADDCG carry-chain + STH/STB->load)
 #   tb_codex_stall external-port hold contract (I/D miss, XNOP, carry, STOP)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds)
+#   tb_hw_sem     constrained-random hardware semaphores (4 seeds)
 set -e
 export PATH="/f/APPs/iverilog/bin:$PATH"
 cd "$(dirname "$0")"
@@ -48,6 +49,13 @@ iverilog -g2012 -I . -o tb_coherence.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coh
 for seed in 1 2 3 4; do
     echo "### Running  tb_coherence seed $seed ###" | tee -a "$LOG"
     vvp tb_coherence.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+done
+
+# hardware semaphores (hw_sem.v): mutual exclusion + non-atomic RMW + starvation, 4 seeds
+iverilog -g2012 -I . -o tb_hw_sem.vvp hw_sem.v tb_hw_sem.v
+for seed in 1 2 3 4; do
+    echo "### Running  tb_hw_sem seed $seed ###" | tee -a "$LOG"
+    vvp tb_hw_sem.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
 done
 
 echo "================= SUITE SUMMARY =================" | tee -a "$LOG"
