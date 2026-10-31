@@ -28,14 +28,21 @@
 //              schedule is unchanged.
 //   EXT_IMEM : 1 = packets come from the i_* port (an L1 I-cache); a fetch
 //              miss holds the core the same way.
+//
+// PERFORMANCE INDICATOR UNIT (2026-10-31 r5, reviews/contracts/piu.md):
+//   PIU      : 1 = slot-3 accesses with addr[15:8] == 8'hFE go to this core's
+//              rvex_piu (event counters) instead of dmem / the D port. They
+//              complete in one cycle and never stall.
 //======================================================================
 `include "rvex_defs.vh"
+`include "rvex_piu.v"
 
 module rvex_core #(
     parameter PC_W     = 12,
     parameter DMEM_AW  = 16,
     parameter EXT_DMEM = 0,
-    parameter EXT_IMEM = 0
+    parameter EXT_IMEM = 0,
+    parameter PIU      = 1
 ) (
     input  wire clk,
     input  wire reset,
@@ -141,7 +148,9 @@ module rvex_core #(
     wire [DMEM_AW-1:0] dmem_byte_addr = mem_ea[DMEM_AW-1:0];
     wire [DMEM_AW-3:0] dmem_word_addr = dmem_byte_addr[DMEM_AW-1:2];
     wire [1:0] dmem_pos       = mem_ea[1:0];
-    wire [31:0] dmem_word     = EXT_DMEM ? d_rdata : dmem[dmem_word_addr];
+    wire        piu_hit       = PIU && (op3[6:4] == 3'b001) && mem_ea[15:8] == 8'hFE;
+    wire [31:0] piu_rdata;
+    wire [31:0] dmem_word     = piu_hit ? piu_rdata : EXT_DMEM ? d_rdata : dmem[dmem_word_addr];
     wire [31:0] mem_load, mem_store; wire mem_is_load, mem_is_store, mem_v;
     mem_unit u_mem(.opcode(op3),.mem_val(dmem_word),.reg_val(gr_r2_3),.pos(dmem_pos),
                    .load_data(mem_load),.store_data(mem_store),
@@ -170,12 +179,25 @@ module rvex_core #(
     wire   fstall  = i_req && !i_ready;          // packet not fetched yet
     wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop;
     wire mem_acc = (op3[6:4] == 3'b001) && (mem_is_load || mem_is_store);
-    assign d_req   = EXT_DMEM && issue && mem_acc;
+    assign d_req   = EXT_DMEM && issue && mem_acc && !piu_hit;
     assign d_we    = mem_is_store;
     assign d_addr  = {mem_ea[31:2], 2'b00};
     assign d_wdata = mem_store;
     assign d_word  = (op3 == `MEM_LDW) || (op3 == `MEM_STW);
     wire   dstall  = d_req && !d_ready;
+
+    // ---- performance indicator unit ----
+    wire   active  = running && !done;
+    wire   commit  = issue && !dstall;
+    rvex_piu u_piu(.clk(clk), .reset(reset),
+        .active(active), .commit(commit), .xnop_c(active && stall_cnt != 0),
+        .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall), .semstall_c(&mem_ea[15:8]),
+        .op0(op0), .op1(op1), .op2(op2), .op3(op3),
+        .ctrl0(slot0_is_ctrl), .taken0(slot0_is_ctrl && c_taken && !c_xnop),
+        .mul1(is_mul(op1)), .mul2(is_mul(op2)),
+        .ld3(mem_acc && mem_is_load), .st3(mem_acc && mem_is_store),
+        .addr(mem_ea[7:2]), .rdata(piu_rdata),
+        .we(commit && piu_hit && mem_is_store), .wdata(mem_store));
 
     // ================= sequential execution =================
     always @(posedge clk) begin
@@ -226,7 +248,7 @@ module rvex_core #(
 
                     //--------------- writeback slot 3 (ALU or MEM) ---------------
                     if (op3[6:4] == 3'b001) begin           // MEM range
-                        if (mem_is_store && !EXT_DMEM) dmem[dmem_word_addr] <= mem_store;
+                        if (mem_is_store && !EXT_DMEM && !piu_hit) dmem[dmem_word_addr] <= mem_store;
                         else if (mem_is_load && dst3 != 6'd0) gr[dst3] <= mem_load;
                         // PFT / SYL_FOLLOW -> no writeback
                     end else if (op3 == `ALU_MTB) br[dbr3] <= alu3_c;
