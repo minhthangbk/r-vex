@@ -17,6 +17,7 @@
 #   tb_piu        performance indicator unit, bare core (reviews/contracts/piu.md)
 #   tb_piu_sys    PIU in rvex_system: misses, hw_sem, per-core PIUs
 #   tb_cmpbr      compare to BR with an immediate (reviews/contracts/cmpbr.md)
+#   tb_brnew      brn/brfn: branch on the BR written in its own packet (reviews/contracts/brnew.md)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds)
 #   tb_hw_sem     constrained-random hardware semaphores (4 seeds)
 set -e
@@ -56,6 +57,8 @@ run tb_codex_piu_r11     "$CORE"                               tb_codex_piu_r11.
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v
 run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldbr.v
 run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v
+run tb_brnew           "$CORE"                             tb_brnew.v
+run tb_codex_brnew_edges "$CORE"                           tb_codex_brnew_edges.v
 # compare to BR with an immediate (reviews/contracts/cmpbr.md), 3 seeds
 iverilog -g2012 -I . -o tb_cmpbr.vvp $CORE tb_cmpbr.v
 for seed in 1 2 3; do

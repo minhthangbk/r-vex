@@ -171,7 +171,24 @@ module rvex_core #(
     // ---- control unit (slot 0) ----
     wire [PC_W-1:0] c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
     wire [11:0] c_xnop_n;
-    wire c_br_in = br[syl0[4:2]]; // BR/BRF read rb = syl[4:2]
+    // BR/BRF read rb = syl[4:2]. With syl[17] set (brn/brfn,
+    // reviews/contracts/brnew.md) the branch takes the value that slot 1..3
+    // of this packet writes to that BR (slot 3 last, as in the writeback).
+    function brw_hit; input [6:0] op; input [1:0] imt; input [31:0] syl; input [2:0] b; begin
+        if (op == `ALU_MTB || is_addcg_divs(op))       brw_hit = (syl[4:2] == b);
+        else if (is_brimm(op, imt))                    brw_hit = (syl[19:17] == b);
+        else if (is_cmp(op) && syl[22:17] == 6'd0)     brw_hit = (syl[4:2] == b);
+        else                                           brw_hit = 1'b0;
+    end endfunction
+    function brw_val; input [6:0] op; input [31:0] r; input c; begin
+        brw_val = (op == `ALU_MTB || is_addcg_divs(op)) ? c : r[0];
+    end endfunction
+    wire [2:0] c_bi = syl0[4:2];
+    wire c_new = syl0[17] && (op0 == `CTRL_BR || op0 == `CTRL_BRF);
+    wire c_br_in = !c_new ? br[c_bi] :
+                   brw_hit(op3, imt3, syl3, c_bi) && op3[6:4] != 3'b001 ? brw_val(op3, alu3_r, alu3_c) :
+                   brw_hit(op2, imt2, syl2, c_bi) ? brw_val(op2, alu2_r, alu2_c) :
+                   brw_hit(op1, imt1, syl1, c_bi) ? brw_val(op1, alu1_r, alu1_c) : br[c_bi];
     // The link register is implicit ($l0.0 = GR63), as in VEX: syl[16:5] is
     // the offset of return/rfi (SP + offset), so it cannot also name a GR.
     ctrl_unit #(.PC_W(PC_W)) u_ctrl(.opcode(op0),.pc(pc),.lr(gr[63]),.sp(gr[1]),.offset(off0),.br(c_br_in),
