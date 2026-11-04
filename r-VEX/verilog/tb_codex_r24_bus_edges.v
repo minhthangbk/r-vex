@@ -110,10 +110,12 @@ module tb_codex_r24_bus_edges;
         l2w.wb_busy=1; l2w.wb_cnt=2;
         qw=1; wew=1; aw=8'h20; wlw=LOWER;
         @(posedge clk); #1; check(l2w.state==4 && !dw, "write miss enters MWAIT");
-        wait (l2w.state==1); #1; check(l2w.cnt==0, "MWAIT exits through LOOK/lookup retry");
+        // r13 BUG-145 / bus.md L2WB-05 (triage in the r13 review): the access leaves MWAIT in the last
+        // write-behind cycle straight into FETCH; the r12 version of this check expected a LOOK retry
+        @(posedge clk); #1; check(l2w.state==4 && l2w.wb_busy && l2w.wb_cnt==0, "still waits in the last write-behind cycle");
         @(posedge clk); #1;
-        check(l2w.state==3 && l2w.wb_pend && l2w.mem[0]==FLUSH[31:0],
-              "dirty victim posted after wait");
+        check(l2w.state==3 && l2w.wb_pend && !l2w.wb_busy && l2w.mem[0]==FLUSH[31:0],
+              "L2WB-05 MWAIT to FETCH, victim posted");
         @(posedge clk); #1;
         check(dw && l2w.vld[0] && l2w.drt[0] && l2w.dat[0]==LOWER && l2w.wb_busy,
               "write miss installs and starts write behind");

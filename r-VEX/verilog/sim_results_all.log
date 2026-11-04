@@ -877,10 +877,10 @@ tb_bus_lat.v:161: $finish called at 3156000 (1ps)
 5 L2 hit stall=8 expected=8
 6 dirty L2 victim stall=28 expected=28
 7 L2 hit in write-behind stall=8 expected=8
-8 L2 miss in write-behind stall=31 (> 28) mwait=2
+8 L2 miss in write-behind stall=30 (> 28) mwait=2
 BUSLAT fast=0 fwd=0 wbb=0 wbuf=1 miss=28 hit=8 upgr=3 dirtyL1=37 dirtyL2=28 errors=0
 RESULT: BUSLAT PASSED
-tb_bus_lat.v:161: $finish called at 3076000 (1ps)
+tb_bus_lat.v:161: $finish called at 3066000 (1ps)
 ### Running  tb_bus_lat FAST=1 FWD=1 WBB=1 WBUF=0 DPF=0 ###
 1 L2 miss (clean) stall=25 expected=25
 2 L1 hit stall=0 expected=0
@@ -901,10 +901,10 @@ tb_bus_lat.v:161: $finish called at 2926000 (1ps)
 5 L2 hit stall=5 expected=5
 6 dirty L2 victim stall=25 expected=25
 7 L2 hit in write-behind stall=5 expected=5
-8 L2 miss in write-behind stall=34 (> 25) mwait=8
+8 L2 miss in write-behind stall=33 (> 25) mwait=8
 BUSLAT fast=1 fwd=1 wbb=1 wbuf=1 miss=25 hit=5 upgr=1 dirtyL1=25 dirtyL2=25 errors=0
 RESULT: BUSLAT PASSED
-tb_bus_lat.v:161: $finish called at 2816000 (1ps)
+tb_bus_lat.v:161: $finish called at 2806000 (1ps)
 ### Running  tb_bus_lat FAST=1 FWD=1 WBB=1 WBUF=1 DPF=4 ###
 1 L2 miss (clean) stall=25 expected=25
 2 L1 hit stall=0 expected=0
@@ -913,11 +913,11 @@ tb_bus_lat.v:161: $finish called at 2816000 (1ps)
 5 L2 hit stall=5 expected=5
 6 dirty L2 victim stall=25 expected=25
 7 L2 hit in write-behind stall=5 expected=5
-8 L2 miss in write-behind stall=34 (> 25) mwait=8
+8 L2 miss in write-behind stall=33 (> 25) mwait=8
 9 prefetch hit, dirty victim stall=1 expected=1
 BUSLAT fast=1 fwd=1 wbb=1 wbuf=1 miss=25 hit=5 upgr=1 dirtyL1=25 dirtyL2=25 errors=0
 RESULT: BUSLAT PASSED
-tb_bus_lat.v:161: $finish called at 7016000 (1ps)
+tb_bus_lat.v:161: $finish called at 7006000 (1ps)
 ### Running  tb_bus_lat FAST=0 FWD=0 WBB=1 WBUF=0 DPF=4 ###
 1 L2 miss (clean) stall=28 expected=28
 2 L1 hit stall=0 expected=0
@@ -932,53 +932,53 @@ BUSLAT fast=0 fwd=0 wbb=1 wbuf=0 miss=28 hit=8 upgr=3 dirtyL1=28 dirtyL2=48 erro
 RESULT: BUSLAT PASSED
 tb_bus_lat.v:161: $finish called at 7656000 (1ps)
 ### Running  tb_coherence_bus seed 1 ###
-COHERENCE seed=1 cycles=50000 loads=3988 stores=3964 bus_txn=6270 c2c=956 l1miss=1919/1911 upgr=371/362 wb=847/855 inval=340/300 l2hit=2355 l2miss=4037 l2wb=2073 errors=0
+COHERENCE seed=1 cycles=50000 loads=4055 stores=4046 bus_txn=6374 c2c=985 l1miss=1958/1947 upgr=374/365 wb=856/869 inval=348/309 l2hit=2409 l2miss=3226 l2wb=2106 errors=0
 PREFETCH pf=2/3 pfhit=0/2 pfkill=0/0
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37585 n_wait=56221 fwd=2290/2273 wbb=996/1002 wbbsnp=149/147 l2wbuf=2073 mwait=857
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37366 n_wait=56338 fwd=2332/2312 wbb=1010/1022 wbbsnp=154/153 l2wbuf=2106 mwait=871
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500796000 (1ps)
+tb_coherence.v:237: $finish called at 500696000 (1ps)
 ### Running  tb_coherence_bus seed 1 sparse ###
-COHERENCE seed=11 cycles=50000 loads=3374 stores=3272 bus_txn=6026 c2c=823 l1miss=1481/1518 upgr=437/392 wb=742/755 inval=304/309 l2hit=2302 l2miss=3555 l2wb=1756 errors=0
-PREFETCH pf=346/355 pfhit=173/187 pfkill=92/94
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35959 n_wait=35275 fwd=1918/1910 wbb=806/812 wbbsnp=64/57 l2wbuf=1756 mwait=815
+COHERENCE seed=11 cycles=50000 loads=3482 stores=3369 bus_txn=6033 c2c=827 l1miss=1545/1521 upgr=406/379 wb=755/763 inval=303/305 l2hit=2277 l2miss=2971 l2wb=1804 errors=0
+PREFETCH pf=331/333 pfhit=172/176 pfkill=81/93
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35627 n_wait=33470 fwd=1951/1900 wbb=816/818 wbbsnp=61/55 l2wbuf=1804 mwait=823
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500236000 (1ps)
+tb_coherence.v:237: $finish called at 500126000 (1ps)
 ### Running  tb_coherence_bus seed 2 ###
-COHERENCE seed=2 cycles=50000 loads=3854 stores=3855 bus_txn=6229 c2c=970 l1miss=1911/1915 upgr=353/356 wb=846/841 inval=350/324 l2hit=2334 l2miss=4039 l2wb=2060 errors=0
-PREFETCH pf=5/2 pfhit=0/0 pfkill=0/0
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37686 n_wait=56191 fwd=2264/2271 wbb=979/1008 wbbsnp=133/167 l2wbuf=2060 mwait=856
+COHERENCE seed=2 cycles=50000 loads=3902 stores=3909 bus_txn=6335 c2c=985 l1miss=1951/1942 upgr=349/370 wb=862/856 inval=355/339 l2hit=2372 l2miss=3244 l2wb=2102 errors=0
+PREFETCH pf=4/1 pfhit=0/0 pfkill=2/1
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37441 n_wait=56250 fwd=2300/2312 wbb=996/1027 wbbsnp=134/171 l2wbuf=2102 mwait=880
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500946000 (1ps)
+tb_coherence.v:237: $finish called at 500606000 (1ps)
 ### Running  tb_coherence_bus seed 2 sparse ###
-COHERENCE seed=12 cycles=50000 loads=3321 stores=3379 bus_txn=6090 c2c=784 l1miss=1516/1471 upgr=424/426 wb=801/755 inval=312/308 l2hit=2238 l2miss=3625 l2wb=1800 errors=0
-PREFETCH pf=365/332 pfhit=189/190 pfkill=99/77
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=36233 n_wait=34956 fwd=1940/1897 wbb=865/810 wbbsnp=64/55 l2wbuf=1800 mwait=766
+COHERENCE seed=12 cycles=50000 loads=3310 stores=3377 bus_txn=6077 c2c=833 l1miss=1520/1523 upgr=416/404 wb=751/762 inval=323/307 l2hit=2236 l2miss=3021 l2wb=1776 errors=0
+PREFETCH pf=338/363 pfhit=171/190 pfkill=98/93
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=36014 n_wait=34195 fwd=1936/1927 wbb=827/821 wbbsnp=76/59 l2wbuf=1776 mwait=795
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500296000 (1ps)
+tb_coherence.v:237: $finish called at 500276000 (1ps)
 ### Running  tb_coherence_bus seed 3 ###
-COHERENCE seed=3 cycles=50000 loads=3955 stores=3852 bus_txn=6284 c2c=956 l1miss=1951/1912 upgr=345/382 wb=847/842 inval=314/313 l2hit=2445 l2miss=3913 l2wb=2020 errors=0
+COHERENCE seed=3 cycles=50000 loads=4005 stores=3906 bus_txn=6383 c2c=971 l1miss=1980/1944 upgr=352/387 wb=861/854 inval=323/320 l2hit=2484 l2miss=3160 l2wb=2049 errors=0
 PREFETCH pf=3/2 pfhit=1/0 pfkill=0/0
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37540 n_wait=56236 fwd=2296/2294 wbb=999/998 wbbsnp=152/156 l2wbuf=2020 mwait=802
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37337 n_wait=56316 fwd=2332/2331 wbb=1013/1012 wbbsnp=152/158 l2wbuf=2049 mwait=812
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500646000 (1ps)
+tb_coherence.v:237: $finish called at 500586000 (1ps)
 ### Running  tb_coherence_bus seed 3 sparse ###
-COHERENCE seed=13 cycles=50000 loads=3268 stores=3323 bus_txn=5977 c2c=798 l1miss=1485/1475 upgr=415/418 wb=738/755 inval=313/299 l2hit=2177 l2miss=3629 l2wb=1776 errors=0
-PREFETCH pf=344/347 pfhit=188/175 pfkill=96/98
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35902 n_wait=34811 fwd=1900/1893 wbb=802/816 wbbsnp=64/61 l2wbuf=1776 mwait=826
+COHERENCE seed=13 cycles=50000 loads=3315 stores=3388 bus_txn=6112 c2c=819 l1miss=1487/1530 upgr=424/401 wb=752/787 inval=314/305 l2hit=2304 l2miss=2983 l2wb=1820 errors=0
+PREFETCH pf=377/354 pfhit=205/185 pfkill=106/97
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35678 n_wait=34333 fwd=1911/1931 wbb=818/843 wbbsnp=66/56 l2wbuf=1820 mwait=768
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500236000 (1ps)
+tb_coherence.v:237: $finish called at 500166000 (1ps)
 ### Running  tb_coherence_bus seed 4 ###
-COHERENCE seed=4 cycles=50000 loads=3837 stores=3785 bus_txn=6237 c2c=898 l1miss=1921/1890 upgr=335/371 wb=862/853 inval=311/320 l2hit=2337 l2miss=4013 l2wb=2042 errors=0
-PREFETCH pf=2/3 pfhit=0/1 pfkill=0/1
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37665 n_wait=56191 fwd=2256/2261 wbb=1011/992 wbbsnp=149/139 l2wbuf=2042 mwait=820
+COHERENCE seed=4 cycles=50000 loads=3914 stores=3860 bus_txn=6324 c2c=915 l1miss=1962/1924 upgr=324/372 wb=873/862 inval=313/326 l2hit=2374 l2miss=3254 l2wb=2078 errors=0
+PREFETCH pf=3/4 pfhit=1/2 pfkill=0/1
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37449 n_wait=56242 fwd=2286/2296 wbb=1022/1010 wbbsnp=149/148 l2wbuf=2078 mwait=823
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500936000 (1ps)
+tb_coherence.v:237: $finish called at 500536000 (1ps)
 ### Running  tb_coherence_bus seed 4 sparse ###
-COHERENCE seed=14 cycles=50000 loads=3335 stores=3292 bus_txn=5964 c2c=802 l1miss=1448/1499 upgr=421/408 wb=731/756 inval=291/285 l2hit=2199 l2miss=3593 l2wb=1748 errors=0
-PREFETCH pf=356/345 pfhit=185/176 pfkill=101/93
-BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35564 n_wait=33985 fwd=1869/1907 wbb=788/816 wbbsnp=57/60 l2wbuf=1748 mwait=810
+COHERENCE seed=14 cycles=50000 loads=3413 stores=3364 bus_txn=6052 c2c=829 l1miss=1470/1498 upgr=435/398 wb=720/801 inval=315/300 l2hit=2278 l2miss=2941 l2wb=1781 errors=0
+PREFETCH pf=369/361 pfhit=209/194 pfkill=85/96
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35367 n_wait=32953 fwd=1905/1896 wbb=774/856 wbbsnp=54/55 l2wbuf=1781 mwait=769
 RESULT: COHERENCE PASSED
-tb_coherence.v:237: $finish called at 500176000 (1ps)
+tb_coherence.v:237: $finish called at 500536000 (1ps)
 ### Running  tb_codex_r24_bus_edges ###
 PASS FAST bus registers reset
 PASS WBUF registers reset
@@ -993,11 +993,11 @@ PASS FAST L2_LAT=1 decides in request cycle
 PASS FAST L2_LAT=2 does not finish too early
 PASS FAST L2_LAT=2 finishes second cycle
 PASS write miss enters MWAIT
-PASS MWAIT exits through LOOK/lookup retry
-PASS dirty victim posted after wait
+PASS still waits in the last write-behind cycle
+PASS L2WB-05 MWAIT to FETCH, victim posted
 PASS write miss installs and starts write behind
 RESULT: CODEX R24 BUS EDGES PASSED
-tb_codex_r24_bus_edges.v:124: $finish called at 166000 (1ps)
+tb_codex_r24_bus_edges.v:126: $finish called at 156000 (1ps)
 ### Running  tb_codex_r24_wbb_races ###
 PASS s_block prevents park when other core snoops victim
 PASS snooped victim was not duplicated in WBB
@@ -1017,6 +1017,186 @@ COHERENCE seed=6 cycles=50000 loads=2652 stores=2614 bus_txn=4192 c2c=619 l1miss
 BUSR12 fast=0 fwd=0 wbb=1 wbuf=0 n_busy=37446 n_wait=53065 fwd=0/0 wbb=672/664 wbbsnp=97/102 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
 tb_coherence.v:237: $finish called at 500236000 (1ps)
+### Running  tb_verify_r12_wbb ###
+VERIFY R12 WBB coverage: contend=101 inflight=414 demand-drains=45 pflate=7/0 mwait=15/15 wbuf=135 s6 park/blocked=11/1 wbbsnp=16/1
+RESULT: VERIFY R12 WBB PASSED
+tb_verify_r12_wbb.v:304: $finish called at 44425000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=0 WBUF=0 DPF=0 ###
+COHERENCE seed=40 cycles=20000 loads=673 stores=687 bus_txn=1591 c2c=128 l1miss=522/517 upgr=39/40 wb=234/239 inval=78/61 l2hit=757 l2miss=755 l2wb=451 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=15253 n_wait=19783 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200306000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=0 WBUF=0 DPF=4 ###
+COHERENCE seed=44 cycles=20000 loads=947 stores=989 bus_txn=1671 c2c=169 l1miss=507/481 upgr=78/100 wb=246/249 inval=87/88 l2hit=740 l2miss=753 l2wb=477 errors=0
+PREFETCH pf=7/3 pfhit=0/1 pfkill=1/1
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=15077 n_wait=21515 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200916000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=0 WBUF=1 DPF=0 ###
+COHERENCE seed=48 cycles=20000 loads=803 stores=811 bus_txn=1904 c2c=158 l1miss=639/627 upgr=41/45 wb=273/279 inval=85/76 l2hit=943 l2miss=875 l2wb=529 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=1 n_busy=14305 n_wait=19758 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=529 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200196000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=0 WBUF=1 DPF=4 ###
+COHERENCE seed=52 cycles=20000 loads=1214 stores=1160 bus_txn=1996 c2c=215 l1miss=599/610 upgr=111/98 wb=283/285 inval=103/109 l2hit=935 l2miss=852 l2wb=554 errors=0
+PREFETCH pf=4/6 pfhit=0/1 pfkill=0/0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=1 n_busy=14082 n_wait=21860 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=554 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200726000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=1 WBUF=0 DPF=0 ###
+COHERENCE seed=44 cycles=20000 loads=988 stores=1038 bus_txn=1688 c2c=261 l1miss=515/512 upgr=101/105 wb=227/228 inval=86/100 l2hit=621 l2miss=861 l2wb=556 errors=0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=0 n_busy=14979 n_wait=21222 fwd=0/0 wbb=274/262 wbbsnp=47/34 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200466000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=1 WBUF=0 DPF=4 ###
+COHERENCE seed=48 cycles=20000 loads=1003 stores=1068 bus_txn=1712 c2c=261 l1miss=509/530 upgr=109/90 wb=237/229 inval=101/93 l2hit=674 l2miss=839 l2wb=532 errors=0
+PREFETCH pf=3/5 pfhit=1/1 pfkill=0/0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=0 n_busy=14961 n_wait=21747 fwd=0/0 wbb=275/271 wbbsnp=38/42 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200986000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=1 WBUF=1 DPF=0 ###
+COHERENCE seed=52 cycles=20000 loads=1337 stores=1284 bus_txn=2084 c2c=310 l1miss=630/654 upgr=132/118 wb=282/268 inval=105/114 l2hit=801 l2miss=1033 l2wb=653 errors=0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=1 n_busy=13789 n_wait=21515 fwd=0/0 wbb=319/323 wbbsnp=37/55 l2wbuf=653 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200436000 (1ps)
+### Running  tb_coherence FAST=0 FWD=0 WBB=1 WBUF=1 DPF=4 ###
+COHERENCE seed=56 cycles=20000 loads=1266 stores=1249 bus_txn=2083 c2c=340 l1miss=648/639 upgr=120/128 wb=271/271 inval=122/120 l2hit=759 l2miss=1076 l2wb=692 errors=0
+PREFETCH pf=2/4 pfhit=0/0 pfkill=0/0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=1 n_busy=13865 n_wait=22123 fwd=0/0 wbb=311/321 wbbsnp=40/50 l2wbuf=692 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 201156000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=0 WBUF=0 DPF=0 ###
+COHERENCE seed=42 cycles=20000 loads=658 stores=689 bus_txn=1581 c2c=128 l1miss=523/522 upgr=33/32 wb=235/236 inval=74/65 l2hit=744 l2miss=772 l2wb=448 errors=0
+BUSR12 fast=0 fwd=1 wbb=0 wbuf=0 n_busy=15279 n_wait=20943 fwd=556/554 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200236000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=0 WBUF=0 DPF=4 ###
+COHERENCE seed=46 cycles=20000 loads=967 stores=951 bus_txn=1641 c2c=160 l1miss=482/482 upgr=90/86 wb=246/250 inval=74/71 l2hit=710 l2miss=755 l2wb=483 errors=0
+PREFETCH pf=5/0 pfhit=0/0 pfkill=1/0
+BUSR12 fast=0 fwd=1 wbb=0 wbuf=0 n_busy=15165 n_wait=21550 fwd=572/568 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200896000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=0 WBUF=1 DPF=0 ###
+COHERENCE seed=50 cycles=20000 loads=808 stores=834 bus_txn=1898 c2c=166 l1miss=616/629 upgr=51/46 wb=281/275 inval=83/81 l2hit=906 l2miss=895 l2wb=526 errors=0
+BUSR12 fast=0 fwd=1 wbb=0 wbuf=1 n_busy=14335 n_wait=21055 fwd=667/675 wbb=0/0 wbbsnp=0/0 l2wbuf=526 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200306000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=0 WBUF=1 DPF=4 ###
+COHERENCE seed=54 cycles=20000 loads=1170 stores=1164 bus_txn=2002 c2c=194 l1miss=594/590 upgr=108/103 wb=298/305 inval=101/104 l2hit=894 l2miss=897 l2wb=568 errors=0
+PREFETCH pf=2/2 pfhit=0/0 pfkill=0/0
+BUSR12 fast=0 fwd=1 wbb=0 wbuf=1 n_busy=14047 n_wait=21957 fwd=702/693 wbb=0/0 wbbsnp=0/0 l2wbuf=568 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200546000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=1 WBUF=0 DPF=0 ###
+COHERENCE seed=46 cycles=20000 loads=1033 stores=1021 bus_txn=1678 c2c=236 l1miss=497/521 upgr=106/85 wb=236/233 inval=77/88 l2hit=624 l2miss=863 l2wb=544 errors=0
+BUSR12 fast=0 fwd=1 wbb=1 wbuf=0 n_busy=15015 n_wait=21492 fwd=603/606 wbb=279/268 wbbsnp=43/35 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200506000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=1 WBUF=0 DPF=4 ###
+COHERENCE seed=50 cycles=20000 loads=1020 stores=1043 bus_txn=1683 c2c=232 l1miss=509/518 upgr=87/103 wb=242/219 inval=77/78 l2hit=631 l2miss=862 l2wb=543 errors=0
+PREFETCH pf=1/4 pfhit=0/0 pfkill=0/0
+BUSR12 fast=0 fwd=1 wbb=1 wbuf=0 n_busy=15090 n_wait=21744 fwd=596/621 wbb=276/259 wbbsnp=34/40 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 201406000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=1 WBUF=1 DPF=0 ###
+COHERENCE seed=54 cycles=20000 loads=1276 stores=1269 bus_txn=2079 c2c=318 l1miss=647/644 upgr=121/116 wb=271/280 inval=110/93 l2hit=799 l2miss=1043 l2wb=669 errors=0
+BUSR12 fast=0 fwd=1 wbb=1 wbuf=1 n_busy=13802 n_wait=21820 fwd=768/760 wbb=324/327 wbbsnp=53/47 l2wbuf=669 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200406000 (1ps)
+### Running  tb_coherence FAST=0 FWD=1 WBB=1 WBUF=1 DPF=4 ###
+COHERENCE seed=58 cycles=20000 loads=1269 stores=1337 bus_txn=2081 c2c=332 l1miss=632/644 upgr=113/105 wb=294/287 inval=120/103 l2hit=817 l2miss=1046 l2wb=680 errors=0
+PREFETCH pf=4/2 pfhit=0/0 pfkill=0/0
+BUSR12 fast=0 fwd=1 wbb=1 wbuf=1 n_busy=13861 n_wait=22138 fwd=745/749 wbb=343/340 wbbsnp=49/53 l2wbuf=680 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 201056000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=0 WBUF=0 DPF=0 ###
+COHERENCE seed=41 cycles=20000 loads=743 stores=817 bus_txn=1880 c2c=164 l1miss=631/618 upgr=30/41 wb=279/281 inval=93/83 l2hit=938 l2miss=871 l2wb=532 errors=0
+BUSR12 fast=1 fwd=0 wbb=0 wbuf=0 n_busy=16264 n_wait=19797 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200276000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=0 WBUF=0 DPF=4 ###
+COHERENCE seed=45 cycles=20000 loads=1200 stores=1191 bus_txn=1979 c2c=223 l1miss=592/576 upgr=100/117 wb=289/284 inval=102/97 l2hit=899 l2miss=863 l2wb=571 errors=0
+PREFETCH pf=8/13 pfhit=3/5 pfkill=1/1
+BUSR12 fast=1 fwd=0 wbb=0 wbuf=0 n_busy=16109 n_wait=21641 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200566000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=0 WBUF=1 DPF=0 ###
+COHERENCE seed=49 cycles=20000 loads=991 stores=945 bus_txn=2273 c2c=188 l1miss=764/733 upgr=49/74 wb=323/330 inval=92/98 l2hit=1065 l2miss=1085 l2wb=623 errors=0
+BUSR12 fast=1 fwd=0 wbb=0 wbuf=1 n_busy=15457 n_wait=19642 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=623 mwait=273
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200086000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=0 WBUF=1 DPF=4 ###
+COHERENCE seed=53 cycles=20000 loads=1425 stores=1476 bus_txn=2473 c2c=260 l1miss=711/707 upgr=150/136 wb=366/382 inval=117/135 l2hit=1120 l2miss=1067 l2wb=712 errors=0
+PREFETCH pf=11/10 pfhit=4/5 pfkill=4/0
+BUSR12 fast=1 fwd=0 wbb=0 wbuf=1 n_busy=15132 n_wait=22118 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=712 mwait=261
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200556000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=1 WBUF=0 DPF=0 ###
+COHERENCE seed=45 cycles=20000 loads=1239 stores=1220 bus_txn=2013 c2c=291 l1miss=624/600 upgr=114/124 wb=269/282 inval=111/108 l2hit=755 l2miss=1020 l2wb=643 errors=0
+BUSR12 fast=1 fwd=0 wbb=1 wbuf=0 n_busy=16033 n_wait=21436 fwd=0/0 wbb=320/317 wbbsnp=51/35 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200456000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=1 WBUF=0 DPF=4 ###
+COHERENCE seed=49 cycles=20000 loads=1264 stores=1258 bus_txn=2003 c2c=327 l1miss=618/616 upgr=114/124 wb=262/261 inval=117/109 l2hit=743 l2miss=1022 l2wb=649 errors=0
+PREFETCH pf=2/6 pfhit=0/1 pfkill=1/1
+BUSR12 fast=1 fwd=0 wbb=1 wbuf=0 n_busy=16079 n_wait=22018 fwd=0/0 wbb=312/308 wbbsnp=50/47 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200776000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=1 WBUF=1 DPF=0 ###
+COHERENCE seed=53 cycles=20000 loads=1577 stores=1620 bus_txn=2554 c2c=397 l1miss=793/783 upgr=160/133 wb=334/351 inval=155/127 l2hit=982 l2miss=1279 l2wb=805 errors=0
+BUSR12 fast=1 fwd=0 wbb=1 wbuf=1 n_busy=14943 n_wait=21822 fwd=0/0 wbb=387/403 wbbsnp=53/52 l2wbuf=805 mwait=301
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200306000 (1ps)
+### Running  tb_coherence FAST=1 FWD=0 WBB=1 WBUF=1 DPF=4 ###
+COHERENCE seed=57 cycles=20000 loads=1594 stores=1572 bus_txn=2547 c2c=380 l1miss=779/778 upgr=137/143 wb=356/342 inval=132/138 l2hit=995 l2miss=1272 l2wb=814 errors=0
+PREFETCH pf=3/9 pfhit=0/3 pfkill=0/1
+BUSR12 fast=1 fwd=0 wbb=1 wbuf=1 n_busy=14989 n_wait=22501 fwd=0/0 wbb=409/407 wbbsnp=53/65 l2wbuf=814 mwait=343
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200726000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=0 WBUF=0 DPF=0 ###
+COHERENCE seed=43 cycles=20000 loads=815 stores=814 bus_txn=1921 c2c=166 l1miss=621/642 upgr=61/36 wb=278/283 inval=83/75 l2hit=952 l2miss=872 l2wb=523 errors=0
+BUSR12 fast=1 fwd=1 wbb=0 wbuf=0 n_busy=16186 n_wait=21118 fwd=682/678 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200286000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=0 WBUF=0 DPF=4 ###
+COHERENCE seed=47 cycles=20000 loads=1140 stores=1226 bus_txn=2013 c2c=212 l1miss=600/589 upgr=103/112 wb=300/298 inval=105/112 l2hit=952 l2miss=846 l2wb=561 errors=0
+PREFETCH pf=5/6 pfhit=1/1 pfkill=1/2
+BUSR12 fast=1 fwd=1 wbb=0 wbuf=0 n_busy=16056 n_wait=21940 fwd=703/701 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200686000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=0 WBUF=1 DPF=0 ###
+COHERENCE seed=51 cycles=20000 loads=981 stores=978 bus_txn=2294 c2c=205 l1miss=753/749 upgr=63/68 wb=331/330 inval=104/96 l2hit=1066 l2miss=1097 l2wb=650 errors=0
+BUSR12 fast=1 fwd=1 wbb=0 wbuf=1 n_busy=15432 n_wait=21350 fwd=816/817 wbb=0/0 wbbsnp=0/0 l2wbuf=650 mwait=284
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200206000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=0 WBUF=1 DPF=4 ###
+COHERENCE seed=55 cycles=20000 loads=1431 stores=1467 bus_txn=2423 c2c=258 l1miss=729/718 upgr=116/120 wb=363/371 inval=129/125 l2hit=1114 l2miss=1073 l2wb=704 errors=0
+PREFETCH pf=4/2 pfhit=1/0 pfkill=0/1
+BUSR12 fast=1 fwd=1 wbb=0 wbuf=1 n_busy=15220 n_wait=22302 fwd=845/838 wbb=0/0 wbbsnp=0/0 l2wbuf=704 mwait=267
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200446000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=1 WBUF=0 DPF=0 ###
+COHERENCE seed=47 cycles=20000 loads=1200 stores=1283 bus_txn=2016 c2c=318 l1miss=615/615 upgr=123/117 wb=269/277 inval=122/101 l2hit=785 l2miss=991 l2wb=669 errors=0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=0 n_busy=16024 n_wait=21733 fwd=738/732 wbb=312/325 wbbsnp=43/48 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200406000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=1 WBUF=0 DPF=4 ###
+COHERENCE seed=51 cycles=20000 loads=1238 stores=1241 bus_txn=1986 c2c=285 l1miss=613/601 upgr=100/115 wb=277/273 inval=99/99 l2hit=742 l2miss=1029 l2wb=664 errors=0
+PREFETCH pf=2/5 pfhit=0/0 pfkill=0/1
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=0 n_busy=16132 n_wait=21970 fwd=713/716 wbb=326/321 wbbsnp=49/48 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200866000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=1 WBUF=1 DPF=0 ###
+COHERENCE seed=55 cycles=20000 loads=1602 stores=1650 bus_txn=2550 c2c=402 l1miss=798/778 upgr=144/144 wb=337/349 inval=141/126 l2hit=969 l2miss=1293 l2wb=840 errors=0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=14944 n_wait=22076 fwd=942/922 wbb=397/410 wbbsnp=60/61 l2wbuf=840 mwait=337
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200226000 (1ps)
+### Running  tb_coherence FAST=1 FWD=1 WBB=1 WBUF=1 DPF=4 ###
+COHERENCE seed=59 cycles=20000 loads=1634 stores=1490 bus_txn=2530 c2c=383 l1miss=771/785 upgr=167/147 wb=328/327 inval=133/143 l2hit=916 l2miss=1300 l2wb=812 errors=0
+PREFETCH pf=2/3 pfhit=0/0 pfkill=0/0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=15048 n_wait=22562 fwd=938/932 wbb=382/385 wbbsnp=54/58 l2wbuf=812 mwait=364
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 200876000 (1ps)
 ### Running  tb_hw_sem seed 1 ###
 HW_SEM seed=1 cycles=50000 critical_sections=9333 acq=9334 spin=3873
 RESULT: HW_SEM PASSED
@@ -1103,6 +1283,39 @@ RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: CODEX R24 BUS EDGES PASSED
 RESULT: CODEX R24 WBB RACES PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: VERIFY R12 WBB PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: HW_SEM PASSED

@@ -94,6 +94,7 @@ module tb_verify_r12_wbb;
     reg [AW-5:0] la;
     reg [32:0] pk;
     reg pr_mwait;
+    integer n_mwexit = 0;   // r13: MWAIT exits at the last write-behind cycle (L2WB-05 coverage)
     always @(posedge clk) if (!reset) begin
         cyc <= cyc + 1;
         // OWNER (WBB-02, SWMR incl. the buffers)
@@ -157,12 +158,17 @@ module tb_verify_r12_wbb;
         if (c_ready[1] && !c[1].l1d.c_ok && c[1].l1d.busy && (c[1].l1d.cur_pf || c[1].l1d.cur_wbb)) begin
             $display("FWD VIOLATION cyc=%0d cache 1 miss completed by a prefetch/WB fill", cyc); errors = errors + 1;
         end
-        // MWAIT (L2WB-02): having waited while memory was busy, the access must leave MWAIT
-        // in the cycle the write behind ends, not one cycle later
-        if (l2.state == 3'd4 && !l2.wb_busy && pr_mwait) begin
+        // MWAIT (L2WB-02, r13 L2WB-05 / BUG-145): an access never waits while memory is idle, and one
+        // waiting in the last write-behind cycle (wb_cnt == 0) fetches in the next cycle (no lookup redone)
+        if (l2.state == 3'd4 && !l2.wb_busy) begin
             $display("MWAIT VIOLATION cyc=%0d memory idle while an access waits", cyc); errors = errors + 1;
         end
-        pr_mwait <= (l2.state == 3'd4) && l2.wb_busy;
+        if (pr_mwait && l2.state != 3'd3) begin
+            $display("MWAIT VIOLATION cyc=%0d write behind ended, access did not fetch (state %0d)", cyc, l2.state);
+            errors = errors + 1;
+        end
+        pr_mwait <= (l2.state == 3'd4) && l2.wb_busy && l2.wb_cnt == 0;
+        if ((l2.state == 3'd4) && l2.wb_busy && l2.wb_cnt == 0) n_mwexit <= n_mwexit + 1;
         if (b_gnt[0] && c[0].l1d.wsel && c[0].l1d.dreq) n_park2 <= n_park2 + 1;
     end
     initial pr_mwait = 0;
@@ -286,10 +292,10 @@ module tb_verify_r12_wbb;
         end
 
         // coverage of the races (a vacuous run must fail)
-        $display("VERIFY R12 WBB coverage: contend=%0d inflight=%0d demand-drains=%0d pflate=%0d/%0d mwait=%0d wbuf=%0d s6 park/blocked=%0d/%0d wbbsnp=%0d/%0d",
-                 n_contend, n_inflight, n_park2, c[0].l1d.n_pflate, c[1].l1d.n_pflate, l2.n_mwait, l2.n_wbuf,
+        $display("VERIFY R12 WBB coverage: contend=%0d inflight=%0d demand-drains=%0d pflate=%0d/%0d mwait=%0d/%0d wbuf=%0d s6 park/blocked=%0d/%0d wbbsnp=%0d/%0d",
+                 n_contend, n_inflight, n_park2, c[0].l1d.n_pflate, c[1].l1d.n_pflate, l2.n_mwait, n_mwexit, l2.n_wbuf,
                  n_s6park, n_s6blk, c[0].l1d.n_wbbsnp, c[1].l1d.n_wbbsnp);
-        if (n_contend == 0 || n_inflight == 0 || n_park2 == 0 || c[0].l1d.n_pflate == 0 || l2.n_mwait == 0 ||
+        if (n_contend == 0 || n_inflight == 0 || n_park2 == 0 || c[0].l1d.n_pflate == 0 || l2.n_mwait == 0 || n_mwexit == 0 ||
             n_s6park == 0 || c[0].l1d.n_wbbsnp == 0) begin
             $display("COVERAGE FAIL: a race was not reached"); errors = errors + 1;
         end

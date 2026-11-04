@@ -64,6 +64,9 @@ module l2_cache #(
     reg        wb_pend;            // WBUF: a victim was posted, its write starts when the fetch ends
     reg        wb_busy;            // WBUF: memory busy with the write behind
     reg [15:0] wb_cnt;
+    // BUG-145 (r13, bus.md L2WB-05): the channel is free from the next cycle on in the last write-behind
+    // cycle (wb_cnt == 0), so a lookup then fetches at once and a waiting access leaves MWAIT in that cycle
+    wire       mem_free = !wb_busy || wb_cnt == 0;
     // lookup decision this cycle: end of the LOOK count, or (FAST, L2_LAT = 1) the request cycle itself
     wire       look_now = (state == S_LOOK && cnt == 0) ||
                           (FAST && L2_LAT == 1 && state == S_IDLE && req && !done);
@@ -94,7 +97,7 @@ module l2_cache #(
                     done <= 1'b1; state <= S_IDLE;
                 end else begin
                     n_miss <= n_miss + 1;
-                    if (WBUF && ((vld[idx] && drt[idx]) || !we) && wb_busy) begin
+                    if (WBUF && ((vld[idx] && drt[idx]) || !we) && !mem_free) begin
                         state <= S_MWAIT;           // L2WB-02: one memory channel
                     end else if (vld[idx] && drt[idx]) begin
                         n_wb <= n_wb + 1;
@@ -119,8 +122,18 @@ module l2_cache #(
                 S_LOOK: cnt <= cnt - 1;           // (cnt == 0 is look_now)
                 S_MWAIT: begin
                     n_mwait <= n_mwait + 1;
-                    // the write behind ends this cycle: decide again next cycle
-                    if (!wb_busy || wb_cnt == 0) begin state <= S_LOOK; cnt <= 0; end
+                    // the write behind ends this cycle: the miss goes on now (still a miss: one request at
+                    // a time, the line cannot change while it waits); a dirty victim is posted (WBUF = 1 here)
+                    if (mem_free) begin
+                        if (vld[idx] && drt[idx]) begin
+                            n_wb <= n_wb + 1;      // L2WB-05: post the victim after the wait
+                            mem[va+0] <= dat[idx][31:0];   mem[va+1] <= dat[idx][63:32];
+                            mem[va+2] <= dat[idx][95:64];  mem[va+3] <= dat[idx][127:96];
+                            drt[idx] <= 1'b0; vld[idx] <= 1'b0;
+                            wb_pend <= 1'b1; n_wbuf <= n_wbuf + 1;
+                        end
+                        state <= S_FETCH; cnt <= we ? 0 : MEM_LAT - 1;
+                    end
                 end
                 S_WBACK: if (cnt != 0) cnt <= cnt - 1;
                          else begin
