@@ -52,6 +52,8 @@ run tb_piu        "$CORE"                                     tb_piu.v
 run tb_piu_sys    "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_piu_sys.v
 run tb_codex_piu_edges   "rvex_piu.v"                          tb_codex_piu_edges.v
 run tb_codex_piu_core    "$CORE"                               tb_codex_piu_core.v
+run tb_codex_r21_piuaw  "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_r21_piuaw.v
+run tb_codex_semfail     "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_semfail.v
 run tb_codex_piu_dualctrl "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_piu_dualctrl.v
 run tb_codex_piu_r11     "$CORE"                               tb_codex_piu_r11.v
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v
@@ -82,7 +84,8 @@ done
 echo "================= SUITE SUMMARY =================" | tee -a "$LOG"
 grep -E 'RESULT:' "$LOG" | tee -a "$LOG"
 # non-zero exit if any suite reported a failure/mismatch
-if grep -Eq 'FAIL|FAILED|FAILURES' "$LOG"; then
+# whole words (-w): PIU-18 tests print SEMFAIL (R21-1)
+if grep -Eqw 'FAIL|FAILED|FAILURES' "$LOG"; then
     echo "OVERALL: FAILURES PRESENT" | tee -a "$LOG"; exit 1
 else
     echo "OVERALL: ALL SUITES PASSED" | tee -a "$LOG"

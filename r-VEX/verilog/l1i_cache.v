@@ -6,11 +6,15 @@
 // cycles (the next level for instructions; code is never written, so it
 // needs no coherence). Hits are combinational, so a hit keeps the core's
 // one-packet-per-cycle fetch.
+// WARM = 1 (measurement only, BUG-087, 2026-11-04 r10): reset loads set k
+// with program line k (packets 4k..4k+3, tag 0), so a program of at most
+// SETS lines runs with no cold I-miss; WARM = 0 (default) is a cold cache.
 //======================================================================
 module l1i_cache #(
     parameter PC_W     = 12,
     parameter SETS     = 16,
-    parameter FILL_LAT = 8
+    parameter FILL_LAT = 8,
+    parameter WARM     = 0
 ) (
     input  wire            clk,
     input  wire            reset,
@@ -47,7 +51,10 @@ module l1i_cache #(
     integer k;
     always @(posedge clk) begin
         if (reset) begin
-            for (k = 0; k < SETS; k = k + 1) vld[k] <= 1'b0;
+            for (k = 0; k < SETS; k = k + 1) begin
+                vld[k] <= WARM != 0; tg[k] <= {TW{1'b0}};
+            end
+            if (WARM != 0) for (k = 0; k < SETS * 4; k = k + 1) dat[k] <= rom[k];
             filling <= 1'b0; n_hit <= 0; n_miss <= 0;
         end else if (filling) begin
             if (cnt != 0) cnt <= cnt - 1;

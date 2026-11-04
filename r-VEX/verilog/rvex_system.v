@@ -25,7 +25,8 @@ module rvex_system #(
     parameter L2_SETS  = 1024,     // 1024 x 16 B = 16 KB shared
     parameter L2_LAT   = 4,
     parameter MEM_LAT  = 20,
-    parameter IFILL_LAT = 8
+    parameter IFILL_LAT = 8,
+    parameter L1I_WARM = 0         // 1: L1I preloaded at reset (measurement mode, l1i_cache.v WARM)
 ) (
     input  wire        clk,
     input  wire        reset,
@@ -83,7 +84,7 @@ module rvex_system #(
             .d_rdata(d_rdata), .d_ready(d_ready), .stall_cycles(stall_cycles),
             .i_req(i_req), .i_addr(i_addr), .i_rdata(i_rdata), .i_ready(i_ready),
             .istall_cycles(istall_cycles));
-        l1i_cache #(.PC_W(PC_W), .SETS(L1I_SETS), .FILL_LAT(IFILL_LAT)) l1i (
+        l1i_cache #(.PC_W(PC_W), .SETS(L1I_SETS), .FILL_LAT(IFILL_LAT), .WARM(L1I_WARM)) l1i (
             .clk(clk), .reset(reset), .i_req(i_req), .i_addr(i_addr),
             .i_rdata(i_rdata), .i_ready(i_ready));
         l1d_cache #(.AW(AW), .SETS(L1D_SETS)) l1d (

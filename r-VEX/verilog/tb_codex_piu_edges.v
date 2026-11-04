@@ -13,7 +13,7 @@ module tb_codex_piu_edges;
     integer pass = 0, fail = 0, a;
 
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
-        .xnop_c(xnop_c), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0),
+        .xnop_c(xnop_c), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3), .ctrl0(ctrl0),
         .taken0(taken0), .mul1(mul1), .mul2(mul2), .ld3(ld3), .st3(st3),
         .addr(addr), .rdata(rdata), .we(we), .wdata(wdata));
@@ -58,7 +58,7 @@ module tb_codex_piu_edges;
         active = 0;
 
         // PIU-02: every unimplemented word offset, not just 0x54, reads zero.
-        for (a = 6'h17; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL added after R10 (piu.md PIU-16/17)
+        for (a = 6'h18; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18)
             addr = a[5:0]; #1;
             if (rdata !== 0) begin
                 fail = fail + 1;

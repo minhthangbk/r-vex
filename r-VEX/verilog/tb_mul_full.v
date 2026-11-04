@@ -3,12 +3,11 @@
 //----------------------------------------------------------------------
 // Covers every mul.v opcode, including the ones tb_units.v skipped:
 //   - all 16x16->32 variants (MPYLL/LLU/LH/LHU/HH/HHU), signed vs unsigned
-//   - the 32x16->48 saturating variants (MPYL/MPYLU/MPYHU/MPYH/MPYHS)
-//     with BOTH the in-range path AND the overflow/saturation path
-//   - the overflow flag itself
+//   - the 32x16 variants (MPYL/MPYLU/MPYHU/MPYH/MPYHS), truncating mod 2^32
+//     (VEX ISA, reviews/contracts/mul32.md; r10: they saturated before),
+//     in range and wrapping, and the overflow flag that stays 0
 //   - OP_NOP -> 0, and invalid opcode -> out_valid=0
-// Overflow is provoked with product == 2^32 (0x1_0000_0000), the smallest
-// product whose bits[47:32] make $signed(ps[47:32]) > 0.
+// The wrap cases use product == 2^32 (0x1_0000_0000), the old saturation point.
 //======================================================================
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
@@ -50,37 +49,45 @@ module tb_mul_full;
         drive(`MUL_MPYHH ,32'h80000000,32'h80000000); chk("MPYHH (-2^15)^2"  ,mres,32'h40000000); // signed
         drive(`MUL_MPYHHU,32'h80000000,32'h00010000); chk("MPYHHU 0x8000*1"  ,mres,32'h00008000); // unsigned
 
-        //---------------------------------------- 32x16 signed saturating (MPYL)
-        $display("[MPYL 32x16 signed sat]");
-        drive(`MUL_MPYL,32'h00000003,32'h00000004); chk ("MPYL 3*4 in-range" ,mres,32'd12);
-        drive(`MUL_MPYL,32'h00000003,32'h00000004); chkb("MPYL no overflow"  ,mov,1'b0);
-        drive(`MUL_MPYL,32'hFFFFFFFE,32'h00000003); chk ("MPYL -2*3 signed"  ,mres,32'hFFFFFFFA);
-        drive(`MUL_MPYL,32'h00100000,32'h00001000); chk ("MPYL 2^20*2^12 sat",mres,32'h7FFFFFFF); // +sat
-        drive(`MUL_MPYL,32'h00100000,32'h00001000); chkb("MPYL overflow flag",mov,1'b1);
+        //---------------------------------------- 32x16, truncating mod 2^32 (mul32.md MU-01..06)
+        // r10: the products 2^32 and 2^32+... that used to saturate now wrap to their low word
+        $display("[MPYL 32 x INT16(s2) truncating]");
+        drive(`MUL_MPYL,32'h00000003,32'h00000004); chk ("MPYL 3*4"            ,mres,32'd12);
+        drive(`MUL_MPYL,32'hFFFFFFFE,32'h00000003); chk ("MPYL -2*3 signed"    ,mres,32'hFFFFFFFA);
+        drive(`MUL_MPYL,32'h00100000,32'h00001000); chk ("MPYL 2^32 wraps"     ,mres,32'h00000000);
+        drive(`MUL_MPYL,32'h00100000,32'h00001000); chkb("MPYL no overflow"    ,mov,1'b0);
+        drive(`MUL_MPYL,32'h7FFFFFFF,32'h1234FFFF); chk ("MPYL max*-1 (s2 hi ignored)",mres,32'h80000001);
 
-        //---------------------------------------- 32x16 unsigned saturating (MPYLU)
-        $display("[MPYLU 32x16 unsigned sat]");
-        drive(`MUL_MPYLU,32'h00000003,32'h00000004); chk ("MPYLU 3*4"        ,mres,32'd12);
-        drive(`MUL_MPYLU,32'h00100000,32'h00001000); chk ("MPYLU 2^32 sat"   ,mres,32'hFFFFFFFF);
-        drive(`MUL_MPYLU,32'h00100000,32'h00001000); chkb("MPYLU overflow"   ,mov,1'b1);
+        $display("[MPYLU 32 x UINT16(s2) truncating]");
+        drive(`MUL_MPYLU,32'h00000003,32'h00000004); chk ("MPYLU 3*4"          ,mres,32'd12);
+        drive(`MUL_MPYLU,32'h00100000,32'h00001000); chk ("MPYLU 2^32 wraps"   ,mres,32'h00000000);
+        drive(`MUL_MPYLU,32'h00100000,32'h00001000); chkb("MPYLU no overflow"  ,mov,1'b0);
+        drive(`MUL_MPYLU,32'hFFFFFFFF,32'h0000FFFF); chk ("MPYLU -1*65535"     ,mres,32'hFFFF0001);
+        drive(`MUL_MPYLU,32'hFFFFFFFD,32'h00000007); chk ("MPYLU -3*7 (BUG-008)",mres,32'hFFFFFFEB);
 
-        //---------------------------------------- 32x(hi16) unsigned saturating (MPYHU)
-        $display("[MPYHU 32x hi16 unsigned sat]");
-        drive(`MUL_MPYHU,32'h00000001,32'h80000000); chk ("MPYHU 1*0x8000"   ,mres,32'h00008000);
-        drive(`MUL_MPYHU,32'h00100000,32'h10000000); chk ("MPYHU 2^32 sat"   ,mres,32'hFFFFFFFF);
-        drive(`MUL_MPYHU,32'h00100000,32'h10000000); chkb("MPYHU overflow"   ,mov,1'b1);
+        $display("[MPYHU 32 x UINT16(s2>>16) truncating]");
+        drive(`MUL_MPYHU,32'h00000001,32'h80000000); chk ("MPYHU 1*0x8000"     ,mres,32'h00008000);
+        drive(`MUL_MPYHU,32'h00100000,32'h10000000); chk ("MPYHU 2^32 wraps"   ,mres,32'h00000000);
+        drive(`MUL_MPYHU,32'h00100000,32'h10000000); chkb("MPYHU no overflow"  ,mov,1'b0);
+        drive(`MUL_MPYHU,32'hFFFFFFFF,32'hFFFF1234); chk ("MPYHU -1*0xFFFF"    ,mres,32'hFFFF0001);
 
-        //---------------------------------------- 32x(hi16) signed saturating (MPYH)
-        $display("[MPYH 32x hi16 signed sat]");
-        drive(`MUL_MPYH,32'h00000003,32'h00020000); chk ("MPYH 3*hi(2)"      ,mres,32'd6);
-        drive(`MUL_MPYH,32'h00100000,32'h10000000); chk ("MPYH 2^32 +sat"    ,mres,32'h7FFFFFFF);
-        drive(`MUL_MPYH,32'h00100000,32'h10000000); chkb("MPYH overflow"     ,mov,1'b1);
+        $display("[MPYH 32 x INT16(s2>>16) truncating]");
+        drive(`MUL_MPYH,32'h00000003,32'h00020000); chk ("MPYH 3*hi(2)"        ,mres,32'd6);
+        drive(`MUL_MPYH,32'h00100000,32'h10000000); chk ("MPYH 2^32 wraps"     ,mres,32'h00000000);
+        drive(`MUL_MPYH,32'h00100000,32'h10000000); chkb("MPYH no overflow"    ,mov,1'b0);
+        drive(`MUL_MPYH,32'h00000005,32'hFFFE0000); chk ("MPYH 5*hi(-2)"       ,mres,32'hFFFFFFF6);
 
-        //---------------------------------------- 32x(hi16) signed, <<16 (MPYHS)
-        $display("[MPYHS 32x hi16 <<16]");
-        drive(`MUL_MPYHS,32'h00000001,32'h00010000); chk("MPYHS 1*1 <<16"    ,mres,32'h00010000);
-        drive(`MUL_MPYHS,32'h00000003,32'h00020000); chk("MPYHS 3*2 <<16"    ,mres,32'h00060000);
-        drive(`MUL_MPYHS,32'h00100000,32'h10000000); chk("MPYHS overflow sat",mres,32'hFFFFFFFF);
+        $display("[MPYHS (32 x INT16(s2>>16)) << 16 truncating]");
+        drive(`MUL_MPYHS,32'h00000001,32'h00010000); chk ("MPYHS 1*1 <<16"     ,mres,32'h00010000);
+        drive(`MUL_MPYHS,32'h00000003,32'h00020000); chk ("MPYHS 3*2 <<16"     ,mres,32'h00060000);
+        drive(`MUL_MPYHS,32'h00100000,32'h10000000); chk ("MPYHS 2^48 wraps"   ,mres,32'h00000000);
+        drive(`MUL_MPYHS,32'h00100000,32'h10000000); chkb("MPYHS no overflow"  ,mov,1'b0);
+        drive(`MUL_MPYHS,32'h12345678,32'h00030000); chk ("MPYHS 0x12345678*3" ,mres,32'h03680000);
+        drive(`MUL_MPYHS,32'hFFFFFFFF,32'h00010000); chk ("MPYHS -1*1 <<16"    ,mres,32'hFFFF0000);
+        drive(`MUL_MPYHS,32'h00000007,32'hFFFFFFFD); chk ("MPYHS 7*hi(-3) <<16",mres,32'hFFF90000);
+
+        // MU-07 identity on the two words of -3*7 / 7*-3: mpylu + mpyhs == a*b mod 2^32
+        drive(`MUL_MPYLU,32'h00000007,32'hFFFFFFFD); chk ("MPYLU 7*lo(-3)"     ,mres,32'h0006FFEB);
 
         //---------------------------------------- NOP / invalid
         $display("[nop/invalid]");

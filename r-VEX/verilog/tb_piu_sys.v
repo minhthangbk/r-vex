@@ -57,7 +57,13 @@ module tb_piu_sys;
         P0(6, NOP, NOP, NOP, mst(`MEM_STW,6'd0,6'd13,9'h00));                             // hw_sem release
         P0(7, j12(`CTRL_XNOP,12'd3), NOP, NOP, NOP);
         P0(8, NOP, NOP, NOP, ri(`MEM_LDW,6'd23,6'd10,9'h00));                             // CTRL reads 1
-        P0(9, STOP, NOP, NOP, NOP);
+        // PIU-18 (r10): a sub-word load of hw_sem reads 0xFFFFFFFF (not a test-and-set: not counted),
+        // a free lock is acquired (not counted), the same lock again is busy (counted)
+        P0(9, NOP, NOP, NOP, ri(`MEM_LDB,6'd24,6'd13,9'h04));                             // ldb 0xFF04
+        P0(10, NOP, NOP, NOP, ri(`MEM_LDW,6'd25,6'd13,9'h04));                            // acquire lock 1
+        P0(11, NOP, NOP, NOP, ri(`MEM_LDW,6'd26,6'd13,9'h04));                            // lock 1 busy
+        P0(12, NOP, NOP, NOP, ri(`MEM_LDW,6'd27,6'd10,9'h5C));                            // read SEMFAIL
+        P0(13, STOP, NOP, NOP, NOP);
         // core 1
         P1(0, ri(`ALU_ADD,6'd10,6'd0,9'h7F), ri(`ALU_ADD,6'd11,6'd0,9'h10), ri(`ALU_ADD,6'd13,6'd0,9'hFF), NOP);
         P1(1, ri(`ALU_SHL,6'd10,6'd10,9'd9), ri(`ALU_SHL,6'd12,6'd11,9'd8), ri(`ALU_SHL,6'd13,6'd13,9'd8), NOP);
@@ -86,8 +92,8 @@ module tb_piu_sys;
         chk("PIU-13 DSTALL == core",   dut.cpu[0].core.u_piu.dstall, dut.cpu[0].core.stall_cycles);
         chk("PIU-11 ISTALL > 0",       dut.cpu[0].core.u_piu.istall > 0, 1);
         chk("PIU-11 DSTALL > 0",       dut.cpu[0].core.u_piu.dstall > 0, 1);
-        chk("PIU-07 PKT",              dut.cpu[0].core.u_piu.pkt, 9);
-        chk("PIU-09 LD (PIU+mem+sem+PIU)", dut.cpu[0].core.u_piu.ld, 4);
+        chk("PIU-07 PKT",              dut.cpu[0].core.u_piu.pkt, 13);
+        chk("PIU-09 LD (+3 sem +SEMFAIL)", dut.cpu[0].core.u_piu.ld, 8);
         chk("PIU-09 ST (mem+sem)",     dut.cpu[0].core.u_piu.st, 2);
         chk("PIU-11 XNOP",             dut.cpu[0].core.u_piu.xnop, 3);
         chk("PIU-13 cycle classes",    dut.cpu[0].core.u_piu.cyc,
@@ -102,6 +108,12 @@ module tb_piu_sys;
         chk("PIU-17 core1 SEMSTALL",   dut.cpu[1].core.u_piu.semstall, 1);
         chk("PIU-17 core1 SEMSTALL <= DSTALL", dut.cpu[1].core.u_piu.semstall <= dut.cpu[1].core.u_piu.dstall, 1);
         chk("PIU-14 core1 ST",         dut.cpu[1].core.u_piu.st, 1);
+        chk("core0 ldb hw_sem reads 1s", dut.cpu[0].core.gr[24], 32'hFFFFFFFF);
+        chk("core0 lock 1 acquired",   dut.cpu[0].core.gr[25], 0);
+        chk("core0 lock 1 busy",       dut.cpu[0].core.gr[26], 1);
+        chk("PIU-18 core0 SEMFAIL (busy ldw only)", dut.cpu[0].core.u_piu.semfail, 1);
+        chk("PIU-18 core1 SEMFAIL (lost the race)", dut.cpu[1].core.u_piu.semfail, 1);
+        chk("PIU-18 SEMFAIL read at 0x5C", dut.cpu[0].core.gr[27], 1);
         $display("=============================================================");
         $display("PIU SYS TEST: %0d passed, %0d failed", pass, fail);
         if (fail == 0) $display("RESULT: PIU SYS PASSED"); else $display("RESULT: PIU SYS FAILED");

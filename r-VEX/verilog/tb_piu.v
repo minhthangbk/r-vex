@@ -76,10 +76,10 @@ module tb_piu;
         // 13: STOP: stw CTRL = 0; counted with the old EN (PIU-03) ST 1
         P(13, NOP, NOP, NOP, mst(`MEM_STW,6'd0,6'd10,9'h00));
         // ---- frozen ----
-        // 14..16: read PKT, CYCLE, offset 0x5C (first hole) while EN = 0
+        // 14..16: read PKT, CYCLE, offset 0x60 (first hole since PIU-18 SEMFAIL took 0x5C) while EN = 0
         P(14, NOP, NOP, NOP, ri(`MEM_LDW,6'd30,6'd10,9'h10));
         P(15, NOP, NOP, NOP, ri(`MEM_LDW,6'd31,6'd10,9'h08));
-        P(16, NOP, NOP, NOP, ri(`MEM_LDW,6'd32,6'd10,9'h5C));
+        P(16, NOP, NOP, NOP, ri(`MEM_LDW,6'd32,6'd10,9'h60));
         // 17: stb 3[r10] = r11 (byte lane 3 = 3: CLR + EN), sub-word store (PIU-05)
         P(17, NOP, NOP, NOP, mst(`MEM_STB,6'd11,6'd10,9'h03));
         // 18: stw CTRL = 0 (counted: PKT 1)
