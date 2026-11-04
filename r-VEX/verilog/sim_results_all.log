@@ -122,36 +122,45 @@ tb_alu_full.v:143: $finish called at 59000 (1ps)
   PASS MPYLHU 0xFFFF*2 : 0x0001fffe
   PASS MPYHH (-2^15)^2 : 0x40000000
   PASS MPYHHU 0x8000*1 : 0x00008000
-[MPYL 32x16 signed sat]
-  PASS PYL 3*4 in-range : 0x0000000c
-  PASS MPYL no overflow : 0
+[MPYL 32 x INT16(s2) truncating]
+  PASS MPYL 3*4 : 0x0000000c
   PASS MPYL -2*3 signed : 0xfffffffa
-  PASS YL 2^20*2^12 sat : 0x7fffffff
-  PASS YL overflow flag : 1
-[MPYLU 32x16 unsigned sat]
+  PASS MPYL 2^32 wraps : 0x00000000
+  PASS MPYL no overflow : 0
+  PASS  (s2 hi ignored) : 0x80000001
+[MPYLU 32 x UINT16(s2) truncating]
   PASS MPYLU 3*4 : 0x0000000c
-  PASS MPYLU 2^32 sat : 0xffffffff
-  PASS MPYLU overflow : 1
-[MPYHU 32x hi16 unsigned sat]
+  PASS MPYLU 2^32 wraps : 0x00000000
+  PASS PYLU no overflow : 0
+  PASS MPYLU -1*65535 : 0xffff0001
+  PASS U -3*7 (BUG-008) : 0xffffffeb
+[MPYHU 32 x UINT16(s2>>16) truncating]
   PASS MPYHU 1*0x8000 : 0x00008000
-  PASS MPYHU 2^32 sat : 0xffffffff
-  PASS MPYHU overflow : 1
-[MPYH 32x hi16 signed sat]
+  PASS MPYHU 2^32 wraps : 0x00000000
+  PASS PYHU no overflow : 0
+  PASS MPYHU -1*0xFFFF : 0xffff0001
+[MPYH 32 x INT16(s2>>16) truncating]
   PASS MPYH 3*hi(2) : 0x00000006
-  PASS MPYH 2^32 +sat : 0x7fffffff
-  PASS MPYH overflow : 1
-[MPYHS 32x hi16 <<16]
+  PASS MPYH 2^32 wraps : 0x00000000
+  PASS MPYH no overflow : 0
+  PASS MPYH 5*hi(-2) : 0xfffffff6
+[MPYHS (32 x INT16(s2>>16)) << 16 truncating]
   PASS MPYHS 1*1 <<16 : 0x00010000
   PASS MPYHS 3*2 <<16 : 0x00060000
-  PASS YHS overflow sat : 0xffffffff
+  PASS MPYHS 2^48 wraps : 0x00000000
+  PASS PYHS no overflow : 0
+  PASS YHS 0x12345678*3 : 0x03680000
+  PASS MPYHS -1*1 <<16 : 0xffff0000
+  PASS HS 7*hi(-3) <<16 : 0xfff90000
+  PASS MPYLU 7*lo(-3) : 0x0006ffeb
 [nop/invalid]
   PASS NOP -> 0 : 0x00000000
   PASS NOP valid : 1
   PASS bad op invalid : 0
 ======================================================
-MUL FULL: 27 passed, 0 failed
+MUL FULL: 36 passed, 0 failed
 RESULT: ALL MUL FULL TESTS PASSED
-tb_mul_full.v:95: $finish called at 27000 (1ps)
+tb_mul_full.v:102: $finish called at 36000 (1ps)
 
 ### Building tb_mem_full ###
 ### Running  tb_mem_full ###
@@ -246,15 +255,15 @@ tb_ctrl.v:112: $finish called at 13000 (1ps)
 ==============================================================
 ALU RANDOM: 12000 checks, 0 failed
 RESULT: ALU RANDOM PASSED
-tb_alu_rand.v:134: $finish called at 4000000 (1ps)
+tb_alu_rand.v:140: $finish called at 4000000 (1ps)
 
 ### Building tb_mul_rand ###
 ### Running  tb_mul_rand ###
 ========= r-VEX MUL constrained-random (4000 vectors) =========
 ==============================================================
-MUL RANDOM: 12000 checks, 0 failed
+MUL RANDOM: 16000 checks, 0 failed
 RESULT: MUL RANDOM PASSED
-tb_mul_rand.v:110: $finish called at 4000000 (1ps)
+tb_mul_rand.v:103: $finish called at 12000000 (1ps)
 
 ### Building tb_core ###
 ### Running  tb_core ###
@@ -316,22 +325,432 @@ tb_core_carry.v:125: $finish called at 175000 (1ps)
 RESULT: CODEX STALL TEST PASSED
 tb_codex_stall.v:105: $finish called at 146000 (1ps)
 
+### Building tb_piu ###
+### Running  tb_piu ###
+  PASS PIU-01 reset EN : 1
+  PASS PIU-01 reset CYCLE : 0
+  PASS PIU-01 reset PKT : 0
+  region snapshot at packet 14:
+  PASS PIU-07 PKT : 10
+  PASS PIU-06 CYCLE : 12
+  PASS PIU-07 OPS : 16
+  PASS PIU-12 ALU : 5
+  PASS PIU-08 MUL16 : 2
+  PASS PIU-08 MUL32 : 2
+  PASS PIU-09 LD : 2
+  PASS PIU-09 ST : 2
+  PASS PIU-10 CTRL : 3
+  PASS PIU-10 BRT : 1
+  PASS PIU-07 NOPPKT : 1
+  PASS PIU-11 XNOP : 2
+  PASS PIU-11 ISTALL : 0
+  PASS PIU-11 DSTALL : 0
+  PASS PIU-07 SLOT0 : 5
+  PASS PIU-07 SLOT1 : 4
+  PASS PIU-07 SLOT2 : 3
+  PASS PIU-07 SLOT3 : 4
+  PASS PIU-16 MULPKT : 2
+  PASS PIU-17 SEMSTALL : 0
+  PASS PIU-03 EN off : 0
+============= PIU directed test (bare core) =============
+  PASS done : 1
+  PASS PIU-01/02 ID ldw : 1346983169
+  PASS PIU-02 ldh lane : 21761
+  PASS PIU-02 hole reads 0 : 0
+  PASS PIU-07 PKT frozen : 10
+  PASS PIU-06 CYCLE frozen : 12
+  PASS PIU-05 sub-word START : 1
+  PASS PIU-05 dmem untouched 0xFE00 : 0
+  PASS PIU-05 dmem untouched 0xFE08 : 0
+  PASS poison skipped : 0
+  PASS mpyll : 35
+  PASS PIU-03 EN-only PKT : 3
+  PASS PIU-06 CYCLE final : 3
+  PASS PIU-07 OPS final : 2
+  PASS PIU-09 ST final : 2
+  PASS PIU-07 NOPPKT final : 1
+  PASS PIU-03 EN after STOP : 0
+=========================================================
+PIU TEST: 41 passed, 0 failed
+RESULT: PIU PASSED
+tb_piu.v:129: $finish called at 305000 (1ps)
+
+### Building tb_piu_sys ###
+### Running  tb_piu_sys ###
+============= PIU system test (2 cores, caches) =============
+  PASS done0 : 1
+  PASS done1 : 1
+  PASS core0 ID : 1346983169
+  PASS core0 D-miss data : 305419896
+  PASS core0 sem acquired : 0
+  PASS core0 CTRL reads EN : 1
+  PASS PIU-05 no d_req : 0
+  PASS PIU-01 CYCLE == cycles : 67
+  PASS PIU-13 ISTALL == core : 19
+  PASS PIU-13 DSTALL == core : 31
+  PASS PIU-11 ISTALL > 0 : 1
+  PASS PIU-11 DSTALL > 0 : 1
+  PASS PIU-07 PKT : 13
+  PASS PIU-09 LD (+3 sem +SEMFAIL) : 8
+  PASS PIU-09 ST (mem+sem) : 2
+  PASS PIU-11 XNOP : 3
+  PASS PIU-13 cycle classes : 67
+  PASS PIU-14 core0 EN kept : 1
+  PASS PIU-14 core1 EN off : 0
+  PASS PIU-14 core1 PKT : 4
+  PASS PIU-14 core1 LD : 1
+  PASS core1 sem found taken : 1
+  PASS PIU-17 core0 SEMSTALL : 0
+  PASS PIU-17 core1 SEMSTALL : 1
+  PASS PIU-17 core1 SEMSTALL <= DSTALL : 1
+  PASS PIU-14 core1 ST : 1
+  PASS core0 ldb hw_sem reads 1s : 4294967295
+  PASS core0 lock 1 acquired : 0
+  PASS core0 lock 1 busy : 1
+  PASS 18 core0 SEMFAIL (busy ldw only) : 1
+  PASS 18 core1 SEMFAIL (lost the race) : 1
+  PASS PIU-18 SEMFAIL read at 0x5C : 1
+=============================================================
+PIU SYS TEST: 32 passed, 0 failed
+RESULT: PIU SYS PASSED
+tb_piu_sys.v:120: $finish called at 725000 (1ps)
+
+### Building tb_codex_piu_edges ###
+### Running  tb_codex_piu_edges ###
+PASS CLR+EN en got=1
+PASS CLR+EN cycle clear wins got=0
+PASS CLR+EN packet clear wins got=0
+PASS CYCLE low carry got=0
+PASS CYCLEH carry got=1
+PASS opcode 12 OPS got=1
+PASS opcode 12 MUL16 got=0
+PASS opcode 12 MUL32 got=0
+PASS opcode 12 ALU got=1
+CODEX PIU EDGES: 49 passed, 0 failed
+RESULT: CODEX PIU EDGES PASSED
+tb_codex_piu_edges.v:82: $finish called at 96000 (1ps)
+
+### Building tb_codex_piu_core ###
+### Running  tb_codex_piu_core ###
+PASS A done got=1
+PASS ores preserve EN until word STOP got=6
+PASS A taken branch counted got=1
+PASS A control counted got=1
+PASS A stores counted got=4
+PASS A poison skipped got=0
+PASS A final EN got=0
+PASS B STOP packet excluded got=1
+PASS B STOP companions excluded OPS got=1
+PASS B STOP companions no writeback got=0
+PASS B STOP cycle included got=2
+PASS C PIU=0 reads dmem got=3735928559
+CODEX PIU CORE: 12 passed, 0 failed
+RESULT: CODEX PIU CORE PASSED
+tb_codex_piu_core.v:88: $finish called at 106000 (1ps)
+
+### Building tb_codex_r21_piuaw ###
+### Running  tb_codex_r21_piuaw ###
+============= Codex R21 PIU window with AW = 17 =============
+  PASS done : 1
+  PASS AW16 alias: PIU EN cleared : 0
+  PASS AW17 ldw 0x1FE00 == stored 6 : 6
+  PASS AW17 PIU EN still 1 : 1
+CODEX R21 PIUAW: 4 passed, 0 failed
+RESULT: CODEX R21 PIUAW PASSED
+tb_codex_r21_piuaw.v:69: $finish called at 475000 (1ps)
+
+### Building tb_codex_semfail ###
+### Running  tb_codex_semfail ###
+============= Codex R20 SEMFAIL (PIU-18) edges =============
+  PASS done (3 cores) : 1
+  PASS pre: busy ldw held : 1
+  PASS one core acquired pkt 2 : 1
+  PASS unaligned ldw busy : 1
+  PASS ldh reads 1s : 4294967295
+  PASS re-acquire after release : 0
+  PASS PIU-18 core0 SEMFAIL : 6
+  PASS PIU-18 core1 SEMFAIL : 4
+  PASS PIU-18 sum == n_spin - 1 : 10
+  PASS PIU-18 readout 0x5C : 6
+  PASS AW17 load 0xFF00 == 1 : 1
+  PASS AW17 no hw_sem access : 0
+  PASS AW17 PIU-18 SEMFAIL 0 : 0
+CODEX SEMFAIL: 13 passed, 0 failed
+RESULT: CODEX SEMFAIL PASSED
+tb_codex_semfail.v:134: $finish called at 515000 (1ps)
+
+### Building tb_codex_piu_dualctrl ###
+### Running  tb_codex_piu_dualctrl ###
+CODEX PIU DUALCTRL: 0 failed
+RESULT: CODEX PIU DUALCTRL PASSED
+tb_codex_piu_dualctrl.v:38: $finish called at 76000 (1ps)
+
+### Building tb_codex_piu_r11 ###
+### Running  tb_codex_piu_r11 ###
+PASS I-miss suppresses d_req got=0
+PASS I-miss is not SEMSTALL got=0
+PASS sub-word hw_sem no DSTALL got=0
+PASS sub-word hw_sem no SEMSTALL got=0
+PASS dual MUL MUL16 got=1
+PASS dual MUL MUL32 got=1
+PASS dual MUL one MULPKT got=1
+PASS undefined opcode is ALU got=1
+PASS undefined opcode not MULPKT got=1
+PASS held hw_sem DSTALL got=2
+PASS held hw_sem SEMSTALL got=2
+PASS mpleted hw_sem no extra SEMSTALL got=2
+CODEX PIU R11: 12 passed, 0 failed
+RESULT: CODEX PIU R11 PASSED
+tb_codex_piu_r11.v:86: $finish called at 106000 (1ps)
+
+### Building tb_verify_piu_pkt ###
+### Running  tb_verify_piu_pkt ###
+========== verify: PIU access with PC change / after stall ==========
+  PASS A done : 1
+  PASS A PIU-03 CYCLE after XNOP+STOP : 7
+  PASS A PIU-11 XNOP held store : 3
+  PASS A PIU-07 PKT frozen : 4
+  PASS A PIU-04 CLR with goto: PKT : 0
+  PASS A PIU-04 CYCLE one packet later : 1
+  PASS A PIU-10 BRT read in br packet : 0
+  PASS A PIU-10 BRT after taken br : 1
+  PASS A PIU-02 load in call packet : 4
+  PASS A call link GR63 : 15
+  PASS A PIU-02 CTRL EN in callee : 1
+  PASS A PIU-03 PKT incl. return+STOP : 7
+  PASS A PIU-03 EN off after return : 0
+  PASS A goto poison skipped : 0
+  PASS A br poison skipped : 0
+  PASS A PIU-05 dmem 0xFE00 untouched : 3735928559
+  PASS A PIU-10 BRT final : 3
+  PASS A PIU-10 CTRL_OPS final : 3
+  PASS A PIU-09 LD final : 6
+  PASS A PIU-09 ST final : 1
+  PASS A PIU-06 CYCLE final : 7
+  PASS B done : 1
+  PASS B PIU-11 ISTALL held store : 3
+  PASS B PIU-06 CYCLE frozen : 4
+  PASS B PIU-07 PKT : 1
+  PASS B PIU-09 ST : 1
+  PASS B PIU-03 EN off : 0
+  PASS B PIU-05 no d_req : 0
+=====================================================================
+VERIFY PIU PKT: 28 passed, 0 failed
+RESULT: VERIFY PIU PKT PASSED
+tb_verify_piu_pkt.v:155: $finish called at 265000 (1ps)
+
+### Building tb_codex_cmpbr_oldbr ###
+### Running  tb_codex_cmpbr_oldbr ###
+CODEX CMPBR OLD-BR: 4 passed, 0 failed
+RESULT: CODEX CMPBR OLD-BR PASSED
+tb_codex_cmpbr_oldbr.v:67: $finish called at 65000 (1ps)
+
+### Building tb_verify_cmpbr_pkt ###
+### Running  tb_verify_cmpbr_pkt ###
+VERIFY CMPBR PKT: 31 passed, 0 failed
+RESULT: VERIFY CMPBR PKT PASSED
+tb_verify_cmpbr_pkt.v:105: $finish called at 165000 (1ps)
+
+### Building tb_brnew ###
+### Running  tb_brnew ###
+BRNEW: 10583 passed, 0 failed
+RESULT: BRNEW PASSED
+tb_brnew.v:169: $finish called at 135615000 (1ps)
+
+### Building tb_codex_brnew_edges ###
+### Running  tb_codex_brnew_edges ###
+RESULT: CODEX BRNEW EDGES PASSED
+tb_codex_brnew_edges.v:114: $finish called at 295000 (1ps)
+
+### Building tb_l1i_pf ###
+### Running  tb_l1i_pf ###
+ok   seq IPF=0 stall = 72
+ok   seq IPF=1 line0 stall = 9
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 later line = 5
+ok   seq IPF=1 pfhit = 7
+ok   branch IPF=0 target stall = 9
+ok   branch IPF=1 target stall = 9
+ok   branch IPF=1 abort = 1
+ok   loop IPF=0 misses = 4
+ok   loop IPF=1 fills = 4
+ok   loop IPF=1 line4 cached = 0
+RESULT: L1I PREFETCH PASSED
+tb_l1i_pf.v:102: $finish called at 2496000 (1ps)
+
+### Building tb_l1d_pf ###
+### Running  tb_l1d_pf ###
+ok   seq demand misses = 2
+ok   seq buffer hits = 6
+ok   random prefetches = 0
+ok   hitpf prefetches during hits = 1
+ok   hitpf hit stalls = 0
+ok   kill buffered = 1
+ok   kill removed = 1
+ok   kill no buffer hit = 0
+ok   race grant to core 0 = 1
+ok   race install held = 0
+ok   race buffer hit = 0
+ok   victim write-back = 1
+ok   victim buffer hit = 1
+ok   store buffer hit = 1
+ok   store upgrade = 1
+ok   two streams buffer hits = 2
+RESULT: L1D PREFETCH PASSED
+tb_l1d_pf.v:186: $finish called at 13346000 (1ps)
+
+### Building tb_codex_r22_ipf_edges ###
+### Running  tb_codex_r22_ipf_edges ###
+PASS WARM+IPF returns warm line immediately
+PASS FILL_LAT 1..3 trace completes
+PASS FILL_LAT 1..3 trace completes
+PASS PC line wrap prefetch is consumed
+PASS cache hit has i_rdata priority over same-set buffer
+RESULT: CODEX R22 IPF EDGES PASSED
+tb_codex_r22_ipf_edges.v:76: $finish called at 297000 (1ps)
+
+### Building tb_codex_r22_dpf_edges ###
+### Running  tb_codex_r22_dpf_edges ###
+PASS same-line demand RDX wins over prefetch RD
+PASS buffer hit installs while snoop targets new line
+PASS same-cycle rearm records new line
+PASS installed line returns buffer data
+PASS demand supersedes pending prefetch
+PASS demand grant drops same-line pending entry
+PASS demand fill installs correct line
+PASS pending entry presents prefetch RD
+PASS store waits for in-flight prefetch
+PASS store consumes prefetched line as shared
+PASS store requests upgrade after install
+PASS store ready only after upgrade
+PASS store data written after upgrade
+PASS FIFO overwrite discards old valid data and records only new pending line
+PASS top data line prefetch wraps to line zero
+PASS preceding stream may allocate dead FE00 prefetch
+RESULT: CODEX R22 DPF EDGES PASSED
+tb_codex_r22_dpf_edges.v:117: $finish called at 226000 (1ps)
+
+### Running  tb_l1d_pf DEG=1 ###
+ok   seq demand misses = 2
+ok   seq buffer hits = 6
+ok   random prefetches = 0
+ok   hitpf prefetches during hits = 1
+ok   hitpf hit stalls = 0
+ok   kill buffered = 1
+ok   kill removed = 1
+ok   kill no buffer hit = 0
+ok   race grant to core 0 = 1
+ok   race install held = 0
+ok   race buffer hit = 0
+ok   victim write-back = 1
+ok   victim buffer hit = 1
+ok   store buffer hit = 1
+ok   store upgrade = 1
+ok   two streams buffer hits = 2
+RESULT: L1D PREFETCH PASSED
+tb_l1d_pf.v:186: $finish called at 13346000 (1ps)
+### Running  tb_cmpbr seed 1 ###
+=========================================================
+CMPBR TEST (seed -1962127875): 2466 passed, 0 failed
+RESULT: CMPBR PASSED
+tb_cmpbr.v:161: $finish called at 6105000 (1ps)
+### Running  tb_cmpbr seed 2 ###
+=========================================================
+CMPBR TEST (seed 327397902): 2466 passed, 0 failed
+RESULT: CMPBR PASSED
+tb_cmpbr.v:161: $finish called at 6105000 (1ps)
+### Running  tb_cmpbr seed 3 ###
+=========================================================
+CMPBR TEST (seed -1678043617): 2466 passed, 0 failed
+RESULT: CMPBR PASSED
+tb_cmpbr.v:161: $finish called at 6105000 (1ps)
 ### Running  tb_coherence seed 1 ###
-COHERENCE seed=1 cycles=50000 loads=1707 stores=1744 bus_txn=4015 c2c=361 l1miss=1313/1329 upgr=102/99 wb=593/579 inval=163/191 l2hit=1958 l2miss=1856 l2wb=1115 errors=0
+COHERENCE seed=1 cycles=50000 loads=1708 stores=1745 bus_txn=4017 c2c=362 l1miss=1313/1330 upgr=102/99 wb=593/580 inval=163/191 l2hit=1960 l2miss=1856 l2wb=1115 errors=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:151: $finish called at 500026000 (1ps)
+tb_coherence.v:199: $finish called at 500216000 (1ps)
 ### Running  tb_coherence seed 2 ###
-COHERENCE seed=2 cycles=50000 loads=1688 stores=1688 bus_txn=3986 c2c=373 l1miss=1325/1326 upgr=96/96 wb=572/571 inval=176/185 l2hit=1930 l2miss=1863 l2wb=1140 errors=0
+COHERENCE seed=2 cycles=50000 loads=1689 stores=1689 bus_txn=3988 c2c=373 l1miss=1325/1327 upgr=96/96 wb=572/572 inval=176/185 l2hit=1932 l2miss=1864 l2wb=1141 errors=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:151: $finish called at 500026000 (1ps)
+tb_coherence.v:199: $finish called at 500376000 (1ps)
 ### Running  tb_coherence seed 3 ###
-COHERENCE seed=3 cycles=50000 loads=1746 stores=1706 bus_txn=4007 c2c=379 l1miss=1341/1356 upgr=98/79 wb=564/569 inval=190/189 l2hit=1958 l2miss=1871 l2wb=1100 errors=0
+COHERENCE seed=3 cycles=50000 loads=1747 stores=1707 bus_txn=4010 c2c=379 l1miss=1342/1357 upgr=98/79 wb=565/569 inval=190/189 l2hit=1960 l2miss=1873 l2wb=1100 errors=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:151: $finish called at 500026000 (1ps)
+tb_coherence.v:199: $finish called at 500396000 (1ps)
 ### Running  tb_coherence seed 4 ###
-COHERENCE seed=4 cycles=50000 loads=1774 stores=1648 bus_txn=3974 c2c=314 l1miss=1306/1324 upgr=101/90 wb=580/573 inval=160/170 l2hit=1871 l2miss=1912 l2wb=1113 errors=0
+COHERENCE seed=4 cycles=50000 loads=1775 stores=1649 bus_txn=3975 c2c=314 l1miss=1306/1325 upgr=101/90 wb=580/573 inval=160/170 l2hit=1871 l2miss=1913 l2wb=1114 errors=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:151: $finish called at 500026000 (1ps)
+tb_coherence.v:199: $finish called at 500256000 (1ps)
+### Running  tb_coherence_pf seed 1 sparse ###
+COHERENCE seed=1 cycles=50000 loads=2181 stores=2109 bus_txn=4073 c2c=455 l1miss=942/922 upgr=274/267 wb=513/498 inval=193/188 l2hit=1567 l2miss=1965 l2wb=1118 errors=0
+PREFETCH pf=339/318 pfhit=128/127 pfkill=59/55
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500826000 (1ps)
+### Running  tb_coherence_pf seed 2 sparse ###
+COHERENCE seed=2 cycles=50000 loads=2115 stores=2090 bus_txn=4122 c2c=460 l1miss=910/934 upgr=287/273 wb=493/509 inval=188/190 l2hit=1573 l2miss=1989 l2wb=1089 errors=0
+PREFETCH pf=357/359 pfhit=150/134 pfkill=55/70
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500336000 (1ps)
+### Running  tb_coherence_pf seed 3 sparse ###
+COHERENCE seed=3 cycles=50000 loads=2100 stores=2102 bus_txn=4082 c2c=438 l1miss=926/937 upgr=279/271 wb=506/516 inval=188/172 l2hit=1568 l2miss=1964 l2wb=1115 errors=0
+PREFETCH pf=313/334 pfhit=112/121 pfkill=74/82
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500806000 (1ps)
+### Running  tb_coherence_pf seed 4 sparse ###
+COHERENCE seed=4 cycles=50000 loads=2131 stores=2113 bus_txn=4107 c2c=426 l1miss=961/922 upgr=270/279 wb=522/511 inval=173/183 l2hit=1569 l2miss=1989 l2wb=1127 errors=0
+PREFETCH pf=308/334 pfhit=105/117 pfkill=60/72
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500446000 (1ps)
+### Running  tb_coherence_pf seed 5 ###
+COHERENCE seed=5 cycles=50000 loads=2443 stores=2419 bus_txn=4188 c2c=403 l1miss=1231/1192 upgr=227/255 wb=630/638 inval=208/208 l2hit=1892 l2miss=1814 l2wb=1202 errors=0
+PREFETCH pf=5/10 pfhit=1/3 pfkill=1/0
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500926000 (1ps)
+### Running  tb_coherence_pf seed 6 ###
+COHERENCE seed=6 cycles=50000 loads=2474 stores=2421 bus_txn=4169 c2c=426 l1miss=1232/1230 upgr=235/225 wb=607/617 inval=219/195 l2hit=1861 l2miss=1848 l2wb=1184 errors=0
+PREFETCH pf=14/9 pfhit=1/3 pfkill=2/0
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 501096000 (1ps)
+### Running  tb_coherence_pf DEG=1 seed 3 sparse ###
+COHERENCE seed=3 cycles=50000 loads=2175 stores=2188 bus_txn=4045 c2c=479 l1miss=942/985 upgr=298/276 wb=525/517 inval=215/206 l2hit=1637 l2miss=1834 l2wb=1123 errors=0
+PREFETCH pf=258/244 pfhit=138/130 pfkill=82/73
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500266000 (1ps)
+### Running  tb_coherence_pf DEG=1 seed 5 sparse ###
+COHERENCE seed=5 cycles=50000 loads=2198 stores=2163 bus_txn=4018 c2c=483 l1miss=983/982 upgr=273/265 wb=514/522 inval=215/200 l2hit=1652 l2miss=1828 l2wb=1095 errors=0
+PREFETCH pf=245/234 pfhit=141/119 pfkill=63/70
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500196000 (1ps)
+### Running  tb_coherence_pf DEG=1 seed 7 sparse ###
+COHERENCE seed=7 cycles=50000 loads=2219 stores=2169 bus_txn=4014 c2c=448 l1miss=937/942 upgr=277/293 wb=518/530 inval=173/196 l2hit=1601 l2miss=1843 l2wb=1099 errors=0
+PREFETCH pf=245/272 pfhit=126/154 pfkill=85/70
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500156000 (1ps)
+### Running  tb_coherence_pf DEG=1 seed 8 sparse ###
+COHERENCE seed=8 cycles=50000 loads=2152 stores=2179 bus_txn=3973 c2c=466 l1miss=942/948 upgr=272/269 wb=526/524 inval=207/211 l2hit=1576 l2miss=1856 l2wb=1120 errors=0
+PREFETCH pf=246/246 pfhit=135/134 pfkill=64/60
+RESULT: COHERENCE PASSED
+tb_coherence.v:199: $finish called at 500026000 (1ps)
+### Running  tb_hw_sem seed 1 ###
+HW_SEM seed=1 cycles=50000 critical_sections=9333 acq=9334 spin=3873
+RESULT: HW_SEM PASSED
+tb_hw_sem.v:84: $finish called at 500025000 (1ps)
+### Running  tb_hw_sem seed 2 ###
+HW_SEM seed=2 cycles=50000 critical_sections=9290 acq=9290 spin=3895
+RESULT: HW_SEM PASSED
+tb_hw_sem.v:84: $finish called at 500025000 (1ps)
+### Running  tb_hw_sem seed 3 ###
+HW_SEM seed=3 cycles=50000 critical_sections=9297 acq=9298 spin=3918
+RESULT: HW_SEM PASSED
+tb_hw_sem.v:84: $finish called at 500025000 (1ps)
+### Running  tb_hw_sem seed 4 ###
+HW_SEM seed=4 cycles=50000 critical_sections=9316 acq=9316 spin=3890
+RESULT: HW_SEM PASSED
+tb_hw_sem.v:84: $finish called at 500025000 (1ps)
 ================= SUITE SUMMARY =================
 RESULT: ALL UNIT TESTS PASSED
 RESULT: ALL ALU FULL TESTS PASSED
@@ -344,8 +763,43 @@ RESULT: CORE TEST PASSED
 RESULT: CORE PROGRAM #2 PASSED
 RESULT: CORE PROGRAM #3 PASSED
 RESULT: CODEX STALL TEST PASSED
+RESULT: PIU PASSED
+RESULT: PIU SYS PASSED
+RESULT: CODEX PIU EDGES PASSED
+RESULT: CODEX PIU CORE PASSED
+RESULT: CODEX R21 PIUAW PASSED
+RESULT: CODEX SEMFAIL PASSED
+RESULT: CODEX PIU DUALCTRL PASSED
+RESULT: CODEX PIU R11 PASSED
+RESULT: VERIFY PIU PKT PASSED
+RESULT: CODEX CMPBR OLD-BR PASSED
+RESULT: VERIFY CMPBR PKT PASSED
+RESULT: BRNEW PASSED
+RESULT: CODEX BRNEW EDGES PASSED
+RESULT: L1I PREFETCH PASSED
+RESULT: L1D PREFETCH PASSED
+RESULT: CODEX R22 IPF EDGES PASSED
+RESULT: CODEX R22 DPF EDGES PASSED
+RESULT: L1D PREFETCH PASSED
+RESULT: CMPBR PASSED
+RESULT: CMPBR PASSED
+RESULT: CMPBR PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: HW_SEM PASSED
+RESULT: HW_SEM PASSED
+RESULT: HW_SEM PASSED
+RESULT: HW_SEM PASSED
 OVERALL: ALL SUITES PASSED

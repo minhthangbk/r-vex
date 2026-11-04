@@ -18,7 +18,8 @@
 #   tb_piu_sys    PIU in rvex_system: misses, hw_sem, per-core PIUs
 #   tb_cmpbr      compare to BR with an immediate (reviews/contracts/cmpbr.md)
 #   tb_brnew      brn/brfn: branch on the BR written in its own packet (reviews/contracts/brnew.md)
-#   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds)
+#   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds; + 6 seeds with DPF = 4)
+#   tb_l1i_pf / tb_l1d_pf  cache prefetch, directed (reviews/contracts/prefetch.md)
 #   tb_hw_sem     constrained-random hardware semaphores (4 seeds)
 set -e
 export PATH="/f/APPs/iverilog/bin:$PATH"
@@ -61,6 +62,22 @@ run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldb
 run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v
 run tb_brnew           "$CORE"                             tb_brnew.v
 run tb_codex_brnew_edges "$CORE"                           tb_codex_brnew_edges.v
+# cache prefetch (reviews/contracts/prefetch.md, r11)
+run tb_l1i_pf          "l1i_cache.v"                       tb_l1i_pf.v
+run tb_l1d_pf          "l1d_cache.v coh_bus.v l2_cache.v"  tb_l1d_pf.v
+# final verify r11: prefetch corners inside MSI, 2 seeds x 2 shapes
+iverilog -g2012 -I . -o tb_verify_r11_dpf.vvp l1d_cache.v coh_bus.v l2_cache.v tb_verify_r11_dpf.v
+iverilog -g2012 -I . -Ptb_verify_r11_dpf.L1S=4 -Ptb_verify_r11_dpf.DEG=2 -o tb_verify_r11_dpf4.vvp l1d_cache.v coh_bus.v l2_cache.v tb_verify_r11_dpf.v
+for seed in 1 2; do
+    echo "### Running  tb_verify_r11_dpf seed $seed ###" | tee -a "$LOG"
+    vvp tb_verify_r11_dpf.vvp +SEED=$seed | tee -a "$LOG"
+    vvp tb_verify_r11_dpf4.vvp +SEED=$seed | tee -a "$LOG"
+done
+run tb_codex_r22_ipf_edges "l1i_cache.v"                  tb_codex_r22_ipf_edges.v
+run tb_codex_r22_dpf_edges "l1d_cache.v coh_bus.v l2_cache.v" tb_codex_r22_dpf_edges.v
+iverilog -g2012 -I . -Ptb_l1d_pf.DEG=1 -o tb_l1d_pf1.vvp l1d_cache.v coh_bus.v l2_cache.v tb_l1d_pf.v
+echo "### Running  tb_l1d_pf DEG=1 ###" | tee -a "$LOG"
+vvp tb_l1d_pf1.vvp | tee -a "$LOG"
 # compare to BR with an immediate (reviews/contracts/cmpbr.md), 3 seeds
 iverilog -g2012 -I . -o tb_cmpbr.vvp $CORE tb_cmpbr.v
 for seed in 1 2 3; do
@@ -72,6 +89,22 @@ iverilog -g2012 -I . -o tb_coherence.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coh
 for seed in 1 2 3 4; do
     echo "### Running  tb_coherence seed $seed ###" | tee -a "$LOG"
     vvp tb_coherence.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+done
+# the same with the L1D stream prefetch buffer (prefetch.md DPF-03): 4 sparse seeds (idle gaps
+# for prefetches) and 2 dense seeds
+iverilog -g2012 -I . -Ptb_coherence.DPF=4 -o tb_coherence_pf.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+for seed in 1 2 3 4; do
+    echo "### Running  tb_coherence_pf seed $seed sparse ###" | tee -a "$LOG"
+    vvp tb_coherence_pf.vvp +SEED=$seed +CYCLES=50000 +SPARSE | tee -a "$LOG"
+done
+for seed in 5 6; do
+    echo "### Running  tb_coherence_pf seed $seed ###" | tee -a "$LOG"
+    vvp tb_coherence_pf.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+done
+iverilog -g2012 -I . -Ptb_coherence.DPF=4 -Ptb_coherence.DPF_DEG=1 -o tb_coherence_pf1.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+for seed in 3 5 7 8; do
+    echo "### Running  tb_coherence_pf DEG=1 seed $seed sparse ###" | tee -a "$LOG"
+    vvp tb_coherence_pf1.vvp +SEED=$seed +CYCLES=50000 +SPARSE | tee -a "$LOG"
 done
 
 # hardware semaphores (hw_sem.v): mutual exclusion + non-atomic RMW + starvation, 4 seeds

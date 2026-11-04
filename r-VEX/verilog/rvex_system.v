@@ -26,7 +26,13 @@ module rvex_system #(
     parameter L2_LAT   = 4,
     parameter MEM_LAT  = 20,
     parameter IFILL_LAT = 8,
-    parameter L1I_WARM = 0         // 1: L1I preloaded at reset (measurement mode, l1i_cache.v WARM)
+    parameter L1I_WARM = 0,        // 1: L1I preloaded at reset (measurement mode, l1i_cache.v WARM)
+    // prefetch (2026-11-04 r11, reviews/contracts/prefetch.md; defaults from the r11 A/B: cached -3.0 %,
+    // cached-small -6.1 % of all suite cycles; L1I_IPF = 0 and L1D_DPF = 0 give the r10 system)
+    parameter L1I_IPF  = 1,        // 1: L1I next-line prefetch buffer (VLIW fetch stream)
+    parameter L1D_DPF  = 4,        // L1D stream prefetch buffer lines (0 = off)
+    parameter L1D_DEG  = 1,        // L1D prefetch degree (lines ahead; 2 was slower: bus bandwidth)
+    parameter L1D_HIST = 4         // L1D demand-miss history (allocation filter)
 ) (
     input  wire        clk,
     input  wire        reset,
@@ -38,7 +44,7 @@ module rvex_system #(
     output wire [31:0] cycles1
 );
     localparam N = 2;
-    wire [N-1:0]     b_req, b_gnt, b_done, s_valid, s_hit_m;
+    wire [N-1:0]     b_req, b_pf, b_gnt, b_done, s_valid, s_hit_m;
     wire [2*N-1:0]   b_op;
     wire [AW*N-1:0]  b_addr;
     wire [128*N-1:0] b_wline, s_line;
@@ -84,14 +90,16 @@ module rvex_system #(
             .d_rdata(d_rdata), .d_ready(d_ready), .stall_cycles(stall_cycles),
             .i_req(i_req), .i_addr(i_addr), .i_rdata(i_rdata), .i_ready(i_ready),
             .istall_cycles(istall_cycles));
-        l1i_cache #(.PC_W(PC_W), .SETS(L1I_SETS), .FILL_LAT(IFILL_LAT), .WARM(L1I_WARM)) l1i (
+        l1i_cache #(.PC_W(PC_W), .SETS(L1I_SETS), .FILL_LAT(IFILL_LAT), .WARM(L1I_WARM),
+                    .IPF(L1I_IPF)) l1i (
             .clk(clk), .reset(reset), .i_req(i_req), .i_addr(i_addr),
             .i_rdata(i_rdata), .i_ready(i_ready));
-        l1d_cache #(.AW(AW), .SETS(L1D_SETS)) l1d (
+        l1d_cache #(.AW(AW), .SETS(L1D_SETS), .DPF(L1D_DPF), .DPF_DEG(L1D_DEG),
+                    .DPF_HIST(L1D_HIST)) l1d (
             .clk(clk), .reset(reset),
             .c_req(d_req && !mmio), .c_we(d_we), .c_addr(d_addr), .c_wdata(d_wdata),
             .c_rdata(c_rdata), .c_ready(c_ready),
-            .b_req(b_req[g]), .b_op(b_op[2*g +: 2]), .b_addr(b_addr[AW*g +: AW]),
+            .b_req(b_req[g]), .b_pf(b_pf[g]), .b_op(b_op[2*g +: 2]), .b_addr(b_addr[AW*g +: AW]),
             .b_wline(b_wline[128*g +: 128]), .b_gnt(b_gnt[g]), .b_done(b_done[g]),
             .b_rline(b_rline),
             .s_valid(s_valid[g]), .s_op(s_op), .s_addr(s_addr),
@@ -103,7 +111,7 @@ module rvex_system #(
     wire [127:0]  l2_wline, l2_rline;
     coh_bus #(.N(N), .AW(AW)) bus (
         .clk(clk), .reset(reset),
-        .m_req(b_req), .m_op(b_op), .m_addr(b_addr), .m_wline(b_wline),
+        .m_req(b_req), .m_pf(b_pf), .m_op(b_op), .m_addr(b_addr), .m_wline(b_wline),
         .m_gnt(b_gnt), .m_done(b_done), .m_rline(b_rline),
         .s_valid(s_valid), .s_op(s_op), .s_addr(s_addr),
         .s_hit_m(s_hit_m), .s_line(s_line),

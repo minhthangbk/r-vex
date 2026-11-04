@@ -19,6 +19,7 @@ module coh_bus #(
     input  wire              reset,
     // masters (packed, master i at [i])
     input  wire [N-1:0]      m_req,
+    input  wire [N-1:0]      m_pf,        // request i is a prefetch (r11): granted only if no demand waits
     input  wire [2*N-1:0]    m_op,
     input  wire [AW*N-1:0]   m_addr,
     input  wire [128*N-1:0]  m_wline,
@@ -54,8 +55,15 @@ module coh_bus #(
     reg        pick_v;
     reg [$clog2(N > 1 ? N : 2)-1:0] pick;
     integer i, j;
+    // demand requests first (r11, prefetch.md DPF-09; TI C66x practice: a prefetch never wins over a
+    // demand), round-robin inside each class
+    wire [N-1:0] m_dem = m_req & ~m_pf;
     always @(*) begin
         pick_v = 1'b0; pick = 0;
+        for (i = 1; i <= N; i = i + 1) begin
+            j = (last + i) % N;
+            if (!pick_v && m_dem[j]) begin pick_v = 1'b1; pick = j; end
+        end
         for (i = 1; i <= N; i = i + 1) begin
             j = (last + i) % N;
             if (!pick_v && m_req[j]) begin pick_v = 1'b1; pick = j; end

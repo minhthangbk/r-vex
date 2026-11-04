@@ -9,12 +9,21 @@
 // WARM = 1 (measurement only, BUG-087, 2026-11-04 r10): reset loads set k
 // with program line k (packets 4k..4k+3, tag 0), so a program of at most
 // SETS lines runs with no cold I-miss; WARM = 0 (default) is a cold cache.
+// IPF = 1 (2026-11-04 r11, contract prefetch.md IPF-01..06): next-line
+// prefetch for the VLIW fetch stream. While the core fetches line L and no
+// demand fill runs, line L+1 (if not cached) is read from the ROM into a
+// one-line buffer after FILL_LAT cycles. A demand miss that finds its line
+// in the buffer is served in the same cycle and installs it (no pollution
+// before use); a miss on the line being prefetched waits for it; a miss on
+// any other line aborts the prefetch (private ROM: no bus to release).
+// IPF = 0 is the r10 cache, cycle for cycle.
 //======================================================================
 module l1i_cache #(
     parameter PC_W     = 12,
     parameter SETS     = 16,
     parameter FILL_LAT = 8,
-    parameter WARM     = 0
+    parameter WARM     = 0,
+    parameter IPF      = 0
 ) (
     input  wire            clk,
     input  wire            reset,
@@ -38,15 +47,32 @@ module l1i_cache #(
     reg [TW-1:0] tg  [0:SETS-1];
     reg [127:0]  dat [0:SETS*4-1];
     reg [31:0]   n_hit, n_miss;
+    reg          filling;
+    reg [15:0]   cnt;
 
     wire [IW-1:0] idx = i_addr[2+IW-1:2];
     wire [TW-1:0] tag = i_addr[PC_W-1:2+IW];
     wire          hit = vld[idx] && tg[idx] == tag;
-    assign i_ready = i_req && hit;
-    assign i_rdata = dat[idx*4 + i_addr[1:0]];
 
-    reg        filling;
-    reg [15:0] cnt;
+    // ---- next-line prefetch buffer (IPF) ----
+    localparam LW = PC_W - 2;
+    reg            pf_v, pf_busy;
+    reg  [LW-1:0]  pf_ln;
+    reg  [127:0]   pf_dat [0:3];
+    reg  [15:0]    pf_cnt;
+    reg  [31:0]    n_pf, n_pfhit, n_pfabort;
+    wire [LW-1:0]  ln    = i_addr[PC_W-1:2];
+    wire [LW-1:0]  nln   = ln + 1'b1;
+    wire [IW-1:0]  nidx  = nln[IW-1:0];
+    wire [TW-1:0]  ntag  = nln[LW-1:IW];
+    wire           pfhit = (IPF != 0) && !hit && pf_v && pf_ln == ln;
+    wire           pf_start = (IPF != 0) && i_req && !filling && !pf_busy && (hit || pfhit) &&
+                              !(vld[nidx] && tg[nidx] == ntag) && !(pf_v && pf_ln == nln);
+    wire           pf_late  = pf_busy && pf_ln == ln;    // the miss waits for this prefetch
+
+    assign i_ready = i_req && (hit || pfhit);
+    assign i_rdata = hit ? dat[idx*4 + i_addr[1:0]] : pf_dat[i_addr[1:0]];
+
     wire [PC_W-1:0] base = {i_addr[PC_W-1:2], 2'b00};
     integer k;
     always @(posedge clk) begin
@@ -56,14 +82,34 @@ module l1i_cache #(
             end
             if (WARM != 0) for (k = 0; k < SETS * 4; k = k + 1) dat[k] <= rom[k];
             filling <= 1'b0; n_hit <= 0; n_miss <= 0;
-        end else if (filling) begin
+            pf_v <= 1'b0; pf_busy <= 1'b0; pf_ln <= {LW{1'b0}}; pf_cnt <= 0;
+            n_pf <= 0; n_pfhit <= 0; n_pfabort <= 0;
+        end else begin
+          // prefetch engine (never runs while a demand fill does)
+          if (pf_start) begin
+              pf_busy <= 1'b1; pf_v <= 1'b0; pf_ln <= nln; pf_cnt <= FILL_LAT - 1; n_pf <= n_pf + 1;
+          end else if (pf_busy) begin
+              if (i_req && !hit && !pfhit && !filling && !pf_late) begin
+                  pf_busy <= 1'b0; n_pfabort <= n_pfabort + 1;        // IPF-05: demand miss wins
+              end else if (pf_cnt != 0) pf_cnt <= pf_cnt - 1;
+              else begin
+                  for (k = 0; k < 4; k = k + 1) pf_dat[k] <= rom[{pf_ln, 2'b00} + k];
+                  pf_v <= 1'b1; pf_busy <= 1'b0;
+              end
+          end
+          if (pfhit && i_req) begin                                   // IPF-04: install on use
+              for (k = 0; k < 4; k = k + 1) dat[idx*4 + k] <= pf_dat[k];
+              vld[idx] <= 1'b1; tg[idx] <= tag; n_pfhit <= n_pfhit + 1;
+          end
+          if (filling) begin
             if (cnt != 0) cnt <= cnt - 1;
             else begin
                 for (k = 0; k < 4; k = k + 1) dat[idx*4 + k] <= rom[base + k];
                 vld[idx] <= 1'b1; tg[idx] <= tag; filling <= 1'b0;
             end
-        end else if (i_req && !hit) begin
+          end else if (i_req && !hit && !pfhit && !pf_late) begin
             filling <= 1'b1; cnt <= FILL_LAT - 1; n_miss <= n_miss + 1;
-        end else if (i_ready) n_hit <= n_hit + 1;
+          end else if (i_req && hit) n_hit <= n_hit + 1;
+        end
     end
 endmodule
