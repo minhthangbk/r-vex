@@ -9,12 +9,23 @@
 // dirty victim and MEM_LAT for fetching the line (not needed for a write,
 // which overwrites the whole line). Main memory `mem` is word addressed and
 // is what testbenches $readmemh the data image into.
+// FAST = 1 (2026-11-04 r12, reviews/contracts/bus.md BUS-04): the cycle the
+// request arrives is the first lookup cycle, so a hit takes L2_LAT cycles
+// from req (r11: L2_LAT + 1).
+// WBUF = 1 (bus.md L2WB-01..03): posted write buffer for a dirty victim. The
+// miss fetches first and completes; the victim is written behind it, keeping
+// the single memory channel busy for MEM_LAT cycles. A memory access that
+// arrives meanwhile waits (n_mwait); hits do not. The victim words are put in
+// `mem` when it is posted, which is what read forwarding from the buffer
+// would return, so only the timing is modelled by the busy counter.
 //======================================================================
 module l2_cache #(
     parameter AW      = 16,
     parameter SETS    = 256,
     parameter L2_LAT  = 4,
-    parameter MEM_LAT = 20
+    parameter MEM_LAT = 20,
+    parameter FAST    = 0,
+    parameter WBUF    = 0
 ) (
     input  wire          clk,
     input  wire          reset,
@@ -45,10 +56,17 @@ module l2_cache #(
     reg [127:0]  dat [0:SETS-1];
 
     reg [31:0] n_hit, n_miss, n_wb;
+    reg [31:0] n_wbuf, n_mwait;    // r12: victims posted, cycles a memory access waited for the write behind
 
-    localparam S_IDLE = 2'd0, S_LOOK = 2'd1, S_WBACK = 2'd2, S_FETCH = 2'd3;
-    reg [1:0]  state;
+    localparam S_IDLE = 3'd0, S_LOOK = 3'd1, S_WBACK = 3'd2, S_FETCH = 3'd3, S_MWAIT = 3'd4;
+    reg [2:0]  state;
     reg [15:0] cnt;
+    reg        wb_pend;            // WBUF: a victim was posted, its write starts when the fetch ends
+    reg        wb_busy;            // WBUF: memory busy with the write behind
+    reg [15:0] wb_cnt;
+    // lookup decision this cycle: end of the LOOK count, or (FAST, L2_LAT = 1) the request cycle itself
+    wire       look_now = (state == S_LOOK && cnt == 0) ||
+                          (FAST && L2_LAT == 1 && state == S_IDLE && req && !done);
 
     wire [IW-1:0] idx = addr[4+IW-1:4];
     wire [TW-1:0] tag = addr[AW-1:4+IW];
@@ -62,41 +80,70 @@ module l2_cache #(
         if (reset) begin
             for (k = 0; k < SETS; k = k + 1) begin vld[k] <= 1'b0; drt[k] <= 1'b0; end
             state <= S_IDLE; cnt <= 0; n_hit <= 0; n_miss <= 0; n_wb <= 0;
-        end else case (state)
-            S_IDLE: if (req && !done) begin state <= S_LOOK; cnt <= L2_LAT - 1; end
-            S_LOOK: if (cnt != 0) cnt <= cnt - 1;
-                    else if (hit) begin
-                        n_hit <= n_hit + 1;
-                        if (we) begin dat[idx] <= wline; drt[idx] <= 1'b1; end
-                        else rline <= dat[idx];
-                        done <= 1'b1; state <= S_IDLE;
-                    end else begin
-                        n_miss <= n_miss + 1;
-                        if (vld[idx] && drt[idx]) begin
-                            state <= S_WBACK; cnt <= MEM_LAT - 1; n_wb <= n_wb + 1;
-                        end else begin
+            n_wbuf <= 0; n_mwait <= 0; wb_pend <= 1'b0; wb_busy <= 1'b0; wb_cnt <= 0;
+        end else begin
+            // WBUF: the write behind occupies the memory channel for MEM_LAT cycles
+            if (wb_busy) begin
+                if (wb_cnt != 0) wb_cnt <= wb_cnt - 1; else wb_busy <= 1'b0;
+            end
+            if (look_now) begin
+                if (hit) begin
+                    n_hit <= n_hit + 1;
+                    if (we) begin dat[idx] <= wline; drt[idx] <= 1'b1; end
+                    else rline <= dat[idx];
+                    done <= 1'b1; state <= S_IDLE;
+                end else begin
+                    n_miss <= n_miss + 1;
+                    if (WBUF && ((vld[idx] && drt[idx]) || !we) && wb_busy) begin
+                        state <= S_MWAIT;           // L2WB-02: one memory channel
+                    end else if (vld[idx] && drt[idx]) begin
+                        n_wb <= n_wb + 1;
+                        if (WBUF) begin             // L2WB-01: post the victim, fetch first
+                            mem[va+0] <= dat[idx][31:0];   mem[va+1] <= dat[idx][63:32];
+                            mem[va+2] <= dat[idx][95:64];  mem[va+3] <= dat[idx][127:96];
+                            drt[idx] <= 1'b0; vld[idx] <= 1'b0;
+                            wb_pend <= 1'b1; n_wbuf <= n_wbuf + 1;
                             state <= S_FETCH; cnt <= we ? 0 : MEM_LAT - 1;
+                        end else begin
+                            state <= S_WBACK; cnt <= MEM_LAT - 1;
                         end
+                    end else begin
+                        state <= S_FETCH; cnt <= we ? 0 : MEM_LAT - 1;
                     end
-            S_WBACK: if (cnt != 0) cnt <= cnt - 1;
-                     else begin
-                         mem[va+0] <= dat[idx][31:0];   mem[va+1] <= dat[idx][63:32];
-                         mem[va+2] <= dat[idx][95:64];  mem[va+3] <= dat[idx][127:96];
-                         drt[idx] <= 1'b0;
-                         state <= S_FETCH; cnt <= we ? 0 : MEM_LAT - 1;
-                     end
-            S_FETCH: if (cnt != 0) cnt <= cnt - 1;
-                     else begin
-                         vld[idx] <= 1'b1; tg[idx] <= tag;
-                         if (we) begin dat[idx] <= wline; drt[idx] <= 1'b1; end
+                end
+            end else case (state)
+                S_IDLE: if (req && !done) begin
+                            state <= S_LOOK;
+                            cnt <= (FAST && L2_LAT > 1) ? L2_LAT - 2 : L2_LAT - 1;
+                        end
+                S_LOOK: cnt <= cnt - 1;           // (cnt == 0 is look_now)
+                S_MWAIT: begin
+                    n_mwait <= n_mwait + 1;
+                    // the write behind ends this cycle: decide again next cycle
+                    if (!wb_busy || wb_cnt == 0) begin state <= S_LOOK; cnt <= 0; end
+                end
+                S_WBACK: if (cnt != 0) cnt <= cnt - 1;
                          else begin
-                             dat[idx] <= {mem[wa+3], mem[wa+2], mem[wa+1], mem[wa+0]};
-                             rline    <= {mem[wa+3], mem[wa+2], mem[wa+1], mem[wa+0]};
+                             mem[va+0] <= dat[idx][31:0];   mem[va+1] <= dat[idx][63:32];
+                             mem[va+2] <= dat[idx][95:64];  mem[va+3] <= dat[idx][127:96];
                              drt[idx] <= 1'b0;
+                             state <= S_FETCH; cnt <= we ? 0 : MEM_LAT - 1;
                          end
-                         done <= 1'b1; state <= S_IDLE;
-                     end
-        endcase
+                S_FETCH: if (cnt != 0) cnt <= cnt - 1;
+                         else begin
+                             vld[idx] <= 1'b1; tg[idx] <= tag;
+                             if (we) begin dat[idx] <= wline; drt[idx] <= 1'b1; end
+                             else begin
+                                 dat[idx] <= {mem[wa+3], mem[wa+2], mem[wa+1], mem[wa+0]};
+                                 rline    <= {mem[wa+3], mem[wa+2], mem[wa+1], mem[wa+0]};
+                                 drt[idx] <= 1'b0;
+                             end
+                             if (wb_pend) begin wb_pend <= 1'b0; wb_busy <= 1'b1; wb_cnt <= MEM_LAT - 1; end
+                             done <= 1'b1; state <= S_IDLE;
+                         end
+                default: state <= S_IDLE;
+            endcase
+        end
     end
 
     // coherent peek (below the L1s): L2 copy if present, else memory

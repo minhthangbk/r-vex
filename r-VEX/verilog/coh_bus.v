@@ -10,10 +10,16 @@
 //   UPGR       : no data; done the next cycle
 //   RD/RDX + M : L2 write of the flushed line, requester gets it
 //   RD/RDX     : L2 read
+// FAST = 1 (2026-11-04 r12, reviews/contracts/bus.md BUS-03): completion
+// (m_done, m_rline) is combinational in the cycle l2_done / the UPGR end is
+// seen, and in the gap cycle after it only the master that just finished may
+// be granted (its WB -> RD/RDX chain or a prefetch goes on; every other master
+// is still kept out for one cycle). FAST = 0 is the r11 bus, cycle for cycle.
 //======================================================================
 module coh_bus #(
     parameter N  = 2,
-    parameter AW = 16
+    parameter AW = 16,
+    parameter FAST = 0
 ) (
     input  wire              clk,
     input  wire              reset,
@@ -24,8 +30,8 @@ module coh_bus #(
     input  wire [AW*N-1:0]   m_addr,
     input  wire [128*N-1:0]  m_wline,
     output wire [N-1:0]      m_gnt,       // combinational, in the grant cycle
-    output reg  [N-1:0]      m_done,
-    output reg  [127:0]      m_rline,
+    output wire [N-1:0]      m_done,
+    output wire [127:0]      m_rline,
     // snoop broadcast (combinational in the grant cycle)
     output wire [N-1:0]      s_valid,     // to cache i: snoop (not the requester)
     output wire [1:0]        s_op,
@@ -50,6 +56,14 @@ module coh_bus #(
     reg         upgr_wait;
 
     reg [31:0] n_txn, n_c2c;
+    reg [31:0] n_busy, n_wait;      // r12 statistics: cycles owned, master-cycles waiting for a grant
+    reg [N-1:0]  done_r;            // registered completion (FAST = 0)
+    reg [127:0]  rline_r;
+    // FAST: completion in the cycle the L2 (or the UPGR) finishes
+    wire         fin = busy && (upgr_wait || l2_done);
+    wire [N-1:0] done_c = fin ? ({{(N-1){1'b0}}, 1'b1} << owner) : {N{1'b0}};
+    assign m_done  = FAST ? done_c : done_r;
+    assign m_rline = FAST ? (flushed ? flush_line : l2_rline) : rline_r;
 
     // ---- arbitration (combinational): first requester after `last` ----
     reg        pick_v;
@@ -78,7 +92,8 @@ module coh_bus #(
     // line before it is used, every time (livelock, also found by
     // tb_coherence). With it every fill is used at least once.
     reg  done_d;
-    wire grant = !busy && !(|m_done) && !done_d && pick_v;
+    // BUS-03: FAST re-grants only the finishing master (`last`) in the gap cycle
+    wire grant = !busy && !(|m_done) && (!done_d || (FAST && pick == last)) && pick_v;
 
     assign s_op   = m_op[2*pick +: 2];
     assign s_addr = m_addr[AW*pick +: AW];
@@ -96,12 +111,24 @@ module coh_bus #(
             if (s_valid[q] && s_hit_m[q]) begin any_m = 1'b1; m_line = s_line[128*q +: 128]; end
     end
 
+    integer w;
+    reg [$clog2(N + 1)-1:0] nw;
+    always @(*) begin
+        nw = 0;
+        for (w = 0; w < N; w = w + 1) if (m_req[w] && !m_gnt[w]) nw = nw + 1;
+    end
     always @(posedge clk) begin
-        m_done <= {N{1'b0}};
+        done_r <= {N{1'b0}};
         done_d <= |m_done;
         if (reset) begin
             busy <= 1'b0; owner <= 0; last <= N - 1; op <= OP_RD; flushed <= 1'b0;
             l2_req <= 1'b0; l2_we <= 1'b0; upgr_wait <= 1'b0; n_txn <= 0; n_c2c <= 0;
+            n_busy <= 0; n_wait <= 0; done_d <= 1'b0;
+        end else begin
+            if (busy) n_busy <= n_busy + 1;
+            n_wait <= n_wait + nw;
+        end
+        if (reset) begin
         end else if (grant) begin
             busy <= 1'b1; owner <= pick; last <= pick; op <= s_op;
             n_txn <= n_txn + 1;
@@ -117,10 +144,10 @@ module coh_bus #(
             endcase
         end else if (busy) begin
             if (upgr_wait) begin
-                upgr_wait <= 1'b0; busy <= 1'b0; m_done[owner] <= 1'b1;
+                upgr_wait <= 1'b0; busy <= 1'b0; done_r[owner] <= 1'b1;
             end else if (l2_done) begin
-                l2_req <= 1'b0; busy <= 1'b0; m_done[owner] <= 1'b1;
-                m_rline <= flushed ? flush_line : l2_rline;
+                l2_req <= 1'b0; busy <= 1'b0; done_r[owner] <= 1'b1;
+                rline_r <= flushed ? flush_line : l2_rline;
             end
         end
     end

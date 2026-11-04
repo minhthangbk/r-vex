@@ -385,16 +385,16 @@ tb_piu.v:129: $finish called at 305000 (1ps)
   PASS core0 sem acquired : 0
   PASS core0 CTRL reads EN : 1
   PASS PIU-05 no d_req : 0
-  PASS PIU-01 CYCLE == cycles : 67
+  PASS PIU-01 CYCLE == cycles : 62
   PASS PIU-13 ISTALL == core : 19
-  PASS PIU-13 DSTALL == core : 31
+  PASS PIU-13 DSTALL == core : 26
   PASS PIU-11 ISTALL > 0 : 1
   PASS PIU-11 DSTALL > 0 : 1
   PASS PIU-07 PKT : 13
   PASS PIU-09 LD (+3 sem +SEMFAIL) : 8
   PASS PIU-09 ST (mem+sem) : 2
   PASS PIU-11 XNOP : 3
-  PASS PIU-13 cycle classes : 67
+  PASS PIU-13 cycle classes : 62
   PASS PIU-14 core0 EN kept : 1
   PASS PIU-14 core1 EN off : 0
   PASS PIU-14 core1 PKT : 4
@@ -413,7 +413,7 @@ tb_piu.v:129: $finish called at 305000 (1ps)
 =============================================================
 PIU SYS TEST: 32 passed, 0 failed
 RESULT: PIU SYS PASSED
-tb_piu_sys.v:120: $finish called at 725000 (1ps)
+tb_piu_sys.v:120: $finish called at 675000 (1ps)
 
 ### Building tb_codex_piu_edges ###
 ### Running  tb_codex_piu_edges ###
@@ -457,7 +457,7 @@ tb_codex_piu_core.v:88: $finish called at 106000 (1ps)
   PASS AW17 PIU EN still 1 : 1
 CODEX R21 PIUAW: 4 passed, 0 failed
 RESULT: CODEX R21 PIUAW PASSED
-tb_codex_r21_piuaw.v:69: $finish called at 475000 (1ps)
+tb_codex_r21_piuaw.v:69: $finish called at 445000 (1ps)
 
 ### Building tb_codex_semfail ###
 ### Running  tb_codex_semfail ###
@@ -604,6 +604,78 @@ ok   two streams buffer hits = 2
 RESULT: L1D PREFETCH PASSED
 tb_l1d_pf.v:186: $finish called at 13346000 (1ps)
 
+### Running  tb_verify_r11_dpf seed 1 ###
+ok   K1 52 buffered = 1
+ok   K1 core 1 installs 52 = 1
+ok   K1 core 0 UPGR granted = 1
+ok   K1 pending 53 survives the UPGR = 1
+ok   K1 53 buffered (flushed copy) = 1
+ok   K1 53 from the buffer = 1
+ok   K2a 82 buffered = 1
+ok   K2a core 0 RD granted = 1
+ok   K2a core 1 install held = 1
+ok   K2a no write-back (victim flushed) = 0
+ok   K2a install from the buffer = 1
+ok   K2b 114 buffered = 1
+ok   K2b core 0 RDX granted = 1
+ok   K2b core 1 install held = 1
+ok   K2b no write-back = 0
+ok   K2b install from the buffer = 1
+ok   K3a 132 pending = 1
+ok   K3a demand RDX = 1
+ok   K3a pending dropped = 0
+ok   K3a only 133 prefetched = 1
+ok   K3a 133 buffered = 1
+ok   K3b prefetch of 142 in flight = 1
+ok   K3b late = 1
+ok   K3b buffer hit = 1
+ok   K3b upgrade = 1
+ok   K4 no kill on RD = 0
+ok   K4 still buffered = 1
+ok   K4 buffer hit after the RD = 1
+ok   K5 useless = valid entries overwritten = 4
+K6 stores/loads issued 5971/9406 core1 pf=527 pfhit=434 pfkill=4 core0 pfhit=530
+RESULT: VERIFY R11 DPF PASSED
+tb_verify_r11_dpf.v:317: $finish called at 416516000 (1ps)
+K6 stores/loads issued 4571/9073 core1 pf=448 pfhit=339 pfkill=27 core0 pfhit=316
+RESULT: VERIFY R11 DPF PASSED
+tb_verify_r11_dpf.v:317: $finish called at 402036000 (1ps)
+### Running  tb_verify_r11_dpf seed 2 ###
+ok   K1 52 buffered = 1
+ok   K1 core 1 installs 52 = 1
+ok   K1 core 0 UPGR granted = 1
+ok   K1 pending 53 survives the UPGR = 1
+ok   K1 53 buffered (flushed copy) = 1
+ok   K1 53 from the buffer = 1
+ok   K2a 82 buffered = 1
+ok   K2a core 0 RD granted = 1
+ok   K2a core 1 install held = 1
+ok   K2a no write-back (victim flushed) = 0
+ok   K2a install from the buffer = 1
+ok   K2b 114 buffered = 1
+ok   K2b core 0 RDX granted = 1
+ok   K2b core 1 install held = 1
+ok   K2b no write-back = 0
+ok   K2b install from the buffer = 1
+ok   K3a 132 pending = 1
+ok   K3a demand RDX = 1
+ok   K3a pending dropped = 0
+ok   K3a only 133 prefetched = 1
+ok   K3a 133 buffered = 1
+ok   K3b prefetch of 142 in flight = 1
+ok   K3b late = 1
+ok   K3b buffer hit = 1
+ok   K3b upgrade = 1
+ok   K4 no kill on RD = 0
+ok   K4 still buffered = 1
+ok   K4 buffer hit after the RD = 1
+ok   K5 useless = valid entries overwritten = 4
+K6 stores/loads issued 5955/9545 core1 pf=525 pfhit=425 pfkill=7 core0 pfhit=503
+RESULT: VERIFY R11 DPF PASSED
+tb_verify_r11_dpf.v:317: $finish called at 416576000 (1ps)
+K6 stores/loads issued 4609/9271 core1 pf=493 pfhit=381 pfkill=29 core0 pfhit=336
+RESULT: VERIFY R11 DPF PASSED
+tb_verify_r11_dpf.v:317: $finish called at 402176000 (1ps)
 ### Building tb_codex_r22_ipf_edges ###
 ### Running  tb_codex_r22_ipf_edges ###
 PASS WARM+IPF returns warm line immediately
@@ -671,70 +743,280 @@ RESULT: CMPBR PASSED
 tb_cmpbr.v:161: $finish called at 6105000 (1ps)
 ### Running  tb_coherence seed 1 ###
 COHERENCE seed=1 cycles=50000 loads=1708 stores=1745 bus_txn=4017 c2c=362 l1miss=1313/1330 upgr=102/99 wb=593/580 inval=163/191 l2hit=1960 l2miss=1856 l2wb=1115 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=37966 n_wait=49328 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500216000 (1ps)
+tb_coherence.v:237: $finish called at 500216000 (1ps)
 ### Running  tb_coherence seed 2 ###
 COHERENCE seed=2 cycles=50000 loads=1689 stores=1689 bus_txn=3988 c2c=373 l1miss=1325/1327 upgr=96/96 wb=572/572 inval=176/185 l2hit=1932 l2miss=1864 l2wb=1141 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=38071 n_wait=49466 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500376000 (1ps)
+tb_coherence.v:237: $finish called at 500376000 (1ps)
 ### Running  tb_coherence seed 3 ###
 COHERENCE seed=3 cycles=50000 loads=1747 stores=1707 bus_txn=4010 c2c=379 l1miss=1342/1357 upgr=98/79 wb=565/569 inval=190/189 l2hit=1960 l2miss=1873 l2wb=1100 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=38005 n_wait=49445 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500396000 (1ps)
+tb_coherence.v:237: $finish called at 500396000 (1ps)
 ### Running  tb_coherence seed 4 ###
 COHERENCE seed=4 cycles=50000 loads=1775 stores=1649 bus_txn=3975 c2c=314 l1miss=1306/1325 upgr=101/90 wb=580/573 inval=160/170 l2hit=1871 l2miss=1913 l2wb=1114 errors=0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=38098 n_wait=49394 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500256000 (1ps)
+tb_coherence.v:237: $finish called at 500256000 (1ps)
 ### Running  tb_coherence_pf seed 1 sparse ###
 COHERENCE seed=1 cycles=50000 loads=2181 stores=2109 bus_txn=4073 c2c=455 l1miss=942/922 upgr=274/267 wb=513/498 inval=193/188 l2hit=1567 l2miss=1965 l2wb=1118 errors=0
 PREFETCH pf=339/318 pfhit=128/127 pfkill=59/55
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=36374 n_wait=40002 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500826000 (1ps)
+tb_coherence.v:237: $finish called at 500826000 (1ps)
 ### Running  tb_coherence_pf seed 2 sparse ###
 COHERENCE seed=2 cycles=50000 loads=2115 stores=2090 bus_txn=4122 c2c=460 l1miss=910/934 upgr=287/273 wb=493/509 inval=188/190 l2hit=1573 l2miss=1989 l2wb=1089 errors=0
 PREFETCH pf=357/359 pfhit=150/134 pfkill=55/70
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=36592 n_wait=42486 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500336000 (1ps)
+tb_coherence.v:237: $finish called at 500336000 (1ps)
 ### Running  tb_coherence_pf seed 3 sparse ###
 COHERENCE seed=3 cycles=50000 loads=2100 stores=2102 bus_txn=4082 c2c=438 l1miss=926/937 upgr=279/271 wb=506/516 inval=188/172 l2hit=1568 l2miss=1964 l2wb=1115 errors=0
 PREFETCH pf=313/334 pfhit=112/121 pfkill=74/82
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=36643 n_wait=40966 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500806000 (1ps)
+tb_coherence.v:237: $finish called at 500806000 (1ps)
 ### Running  tb_coherence_pf seed 4 sparse ###
 COHERENCE seed=4 cycles=50000 loads=2131 stores=2113 bus_txn=4107 c2c=426 l1miss=961/922 upgr=270/279 wb=522/511 inval=173/183 l2hit=1569 l2miss=1989 l2wb=1127 errors=0
 PREFETCH pf=308/334 pfhit=105/117 pfkill=60/72
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=36677 n_wait=41549 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500446000 (1ps)
+tb_coherence.v:237: $finish called at 500446000 (1ps)
 ### Running  tb_coherence_pf seed 5 ###
 COHERENCE seed=5 cycles=50000 loads=2443 stores=2419 bus_txn=4188 c2c=403 l1miss=1231/1192 upgr=227/255 wb=630/638 inval=208/208 l2hit=1892 l2miss=1814 l2wb=1202 errors=0
 PREFETCH pf=5/10 pfhit=1/3 pfkill=1/0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=37526 n_wait=54051 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500926000 (1ps)
+tb_coherence.v:237: $finish called at 500926000 (1ps)
 ### Running  tb_coherence_pf seed 6 ###
 COHERENCE seed=6 cycles=50000 loads=2474 stores=2421 bus_txn=4169 c2c=426 l1miss=1232/1230 upgr=235/225 wb=607/617 inval=219/195 l2hit=1861 l2miss=1848 l2wb=1184 errors=0
 PREFETCH pf=14/9 pfhit=1/3 pfkill=2/0
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=37601 n_wait=54030 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 501096000 (1ps)
+tb_coherence.v:237: $finish called at 501096000 (1ps)
 ### Running  tb_coherence_pf DEG=1 seed 3 sparse ###
 COHERENCE seed=3 cycles=50000 loads=2175 stores=2188 bus_txn=4045 c2c=479 l1miss=942/985 upgr=298/276 wb=525/517 inval=215/206 l2hit=1637 l2miss=1834 l2wb=1123 errors=0
 PREFETCH pf=258/244 pfhit=138/130 pfkill=82/73
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=35394 n_wait=33644 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500266000 (1ps)
+tb_coherence.v:237: $finish called at 500266000 (1ps)
 ### Running  tb_coherence_pf DEG=1 seed 5 sparse ###
 COHERENCE seed=5 cycles=50000 loads=2198 stores=2163 bus_txn=4018 c2c=483 l1miss=983/982 upgr=273/265 wb=514/522 inval=215/200 l2hit=1652 l2miss=1828 l2wb=1095 errors=0
 PREFETCH pf=245/234 pfhit=141/119 pfkill=63/70
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=35315 n_wait=33321 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500196000 (1ps)
+tb_coherence.v:237: $finish called at 500196000 (1ps)
 ### Running  tb_coherence_pf DEG=1 seed 7 sparse ###
 COHERENCE seed=7 cycles=50000 loads=2219 stores=2169 bus_txn=4014 c2c=448 l1miss=937/942 upgr=277/293 wb=518/530 inval=173/196 l2hit=1601 l2miss=1843 l2wb=1099 errors=0
 PREFETCH pf=245/272 pfhit=126/154 pfkill=85/70
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=35210 n_wait=33629 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500156000 (1ps)
+tb_coherence.v:237: $finish called at 500156000 (1ps)
 ### Running  tb_coherence_pf DEG=1 seed 8 sparse ###
 COHERENCE seed=8 cycles=50000 loads=2152 stores=2179 bus_txn=3973 c2c=466 l1miss=942/948 upgr=272/269 wb=526/524 inval=207/211 l2hit=1576 l2miss=1856 l2wb=1120 errors=0
 PREFETCH pf=246/246 pfhit=135/134 pfkill=64/60
+BUSR12 fast=0 fwd=0 wbb=0 wbuf=0 n_busy=35215 n_wait=33240 fwd=0/0 wbb=0/0 wbbsnp=0/0 l2wbuf=0 mwait=0
 RESULT: COHERENCE PASSED
-tb_coherence.v:199: $finish called at 500026000 (1ps)
+tb_coherence.v:237: $finish called at 500026000 (1ps)
+### Running  tb_bus_lat FAST=0 FWD=0 WBB=0 WBUF=0 DPF=0 ###
+1 L2 miss (clean) stall=28 expected=28
+2 L1 hit stall=0 expected=0
+3 UPGR stall=3 expected=3
+4 dirty L1 victim (WB first) stall=37 (> 28)
+5 L2 hit stall=8 expected=8
+6 dirty L2 victim stall=48 expected=48
+7 L2 hit in write-behind stall=8 expected=8
+8 L2 miss stall=28 expected=28
+BUSLAT fast=0 fwd=0 wbb=0 wbuf=0 miss=28 hit=8 upgr=3 dirtyL1=37 dirtyL2=48 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 3246000 (1ps)
+### Running  tb_bus_lat FAST=1 FWD=0 WBB=0 WBUF=0 DPF=0 ###
+1 L2 miss (clean) stall=26 expected=26
+2 L1 hit stall=0 expected=0
+3 UPGR stall=2 expected=2
+4 dirty L1 victim (WB first) stall=32 (> 26)
+5 L2 hit stall=6 expected=6
+6 dirty L2 victim stall=46 expected=46
+7 L2 hit in write-behind stall=6 expected=6
+8 L2 miss stall=26 expected=26
+BUSLAT fast=1 fwd=0 wbb=0 wbuf=0 miss=26 hit=6 upgr=2 dirtyL1=32 dirtyL2=46 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 3066000 (1ps)
+### Running  tb_bus_lat FAST=1 FWD=1 WBB=0 WBUF=0 DPF=0 ###
+1 L2 miss (clean) stall=25 expected=25
+2 L1 hit stall=0 expected=0
+3 UPGR stall=1 expected=1
+4 dirty L1 victim (WB first) stall=31 (> 25)
+5 L2 hit stall=5 expected=5
+6 dirty L2 victim stall=45 expected=45
+7 L2 hit in write-behind stall=5 expected=5
+8 L2 miss stall=25 expected=25
+BUSLAT fast=1 fwd=1 wbb=0 wbuf=0 miss=25 hit=5 upgr=1 dirtyL1=31 dirtyL2=45 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 2986000 (1ps)
+### Running  tb_bus_lat FAST=0 FWD=0 WBB=1 WBUF=0 DPF=0 ###
+1 L2 miss (clean) stall=28 expected=28
+2 L1 hit stall=0 expected=0
+3 UPGR stall=3 expected=3
+4 dirty L1 victim (WBB) stall=28 expected=28
+5 L2 hit stall=8 expected=8
+6 dirty L2 victim stall=48 expected=48
+7 L2 hit in write-behind stall=8 expected=8
+8 L2 miss stall=28 expected=28
+BUSLAT fast=0 fwd=0 wbb=1 wbuf=0 miss=28 hit=8 upgr=3 dirtyL1=28 dirtyL2=48 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 3156000 (1ps)
+### Running  tb_bus_lat FAST=0 FWD=0 WBB=0 WBUF=1 DPF=0 ###
+1 L2 miss (clean) stall=28 expected=28
+2 L1 hit stall=0 expected=0
+3 UPGR stall=3 expected=3
+4 dirty L1 victim (WB first) stall=37 (> 28)
+5 L2 hit stall=8 expected=8
+6 dirty L2 victim stall=28 expected=28
+7 L2 hit in write-behind stall=8 expected=8
+8 L2 miss in write-behind stall=31 (> 28) mwait=2
+BUSLAT fast=0 fwd=0 wbb=0 wbuf=1 miss=28 hit=8 upgr=3 dirtyL1=37 dirtyL2=28 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 3076000 (1ps)
+### Running  tb_bus_lat FAST=1 FWD=1 WBB=1 WBUF=0 DPF=0 ###
+1 L2 miss (clean) stall=25 expected=25
+2 L1 hit stall=0 expected=0
+3 UPGR stall=1 expected=1
+4 dirty L1 victim (WBB) stall=25 expected=25
+5 L2 hit stall=5 expected=5
+6 dirty L2 victim stall=45 expected=45
+7 L2 hit in write-behind stall=5 expected=5
+8 L2 miss stall=25 expected=25
+BUSLAT fast=1 fwd=1 wbb=1 wbuf=0 miss=25 hit=5 upgr=1 dirtyL1=25 dirtyL2=45 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 2926000 (1ps)
+### Running  tb_bus_lat FAST=1 FWD=1 WBB=1 WBUF=1 DPF=0 ###
+1 L2 miss (clean) stall=25 expected=25
+2 L1 hit stall=0 expected=0
+3 UPGR stall=1 expected=1
+4 dirty L1 victim (WBB) stall=25 expected=25
+5 L2 hit stall=5 expected=5
+6 dirty L2 victim stall=25 expected=25
+7 L2 hit in write-behind stall=5 expected=5
+8 L2 miss in write-behind stall=34 (> 25) mwait=8
+BUSLAT fast=1 fwd=1 wbb=1 wbuf=1 miss=25 hit=5 upgr=1 dirtyL1=25 dirtyL2=25 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 2816000 (1ps)
+### Running  tb_bus_lat FAST=1 FWD=1 WBB=1 WBUF=1 DPF=4 ###
+1 L2 miss (clean) stall=25 expected=25
+2 L1 hit stall=0 expected=0
+3 UPGR stall=1 expected=1
+4 dirty L1 victim (WBB) stall=25 expected=25
+5 L2 hit stall=5 expected=5
+6 dirty L2 victim stall=25 expected=25
+7 L2 hit in write-behind stall=5 expected=5
+8 L2 miss in write-behind stall=34 (> 25) mwait=8
+9 prefetch hit, dirty victim stall=1 expected=1
+BUSLAT fast=1 fwd=1 wbb=1 wbuf=1 miss=25 hit=5 upgr=1 dirtyL1=25 dirtyL2=25 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 7016000 (1ps)
+### Running  tb_bus_lat FAST=0 FWD=0 WBB=1 WBUF=0 DPF=4 ###
+1 L2 miss (clean) stall=28 expected=28
+2 L1 hit stall=0 expected=0
+3 UPGR stall=3 expected=3
+4 dirty L1 victim (WBB) stall=28 expected=28
+5 L2 hit stall=8 expected=8
+6 dirty L2 victim stall=48 expected=48
+7 L2 hit in write-behind stall=8 expected=8
+8 L2 miss stall=28 expected=28
+9 prefetch hit, dirty victim stall=1 expected=1
+BUSLAT fast=0 fwd=0 wbb=1 wbuf=0 miss=28 hit=8 upgr=3 dirtyL1=28 dirtyL2=48 errors=0
+RESULT: BUSLAT PASSED
+tb_bus_lat.v:161: $finish called at 7656000 (1ps)
+### Running  tb_coherence_bus seed 1 ###
+COHERENCE seed=1 cycles=50000 loads=3988 stores=3964 bus_txn=6270 c2c=956 l1miss=1919/1911 upgr=371/362 wb=847/855 inval=340/300 l2hit=2355 l2miss=4037 l2wb=2073 errors=0
+PREFETCH pf=2/3 pfhit=0/2 pfkill=0/0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37585 n_wait=56221 fwd=2290/2273 wbb=996/1002 wbbsnp=149/147 l2wbuf=2073 mwait=857
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500796000 (1ps)
+### Running  tb_coherence_bus seed 1 sparse ###
+COHERENCE seed=11 cycles=50000 loads=3374 stores=3272 bus_txn=6026 c2c=823 l1miss=1481/1518 upgr=437/392 wb=742/755 inval=304/309 l2hit=2302 l2miss=3555 l2wb=1756 errors=0
+PREFETCH pf=346/355 pfhit=173/187 pfkill=92/94
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35959 n_wait=35275 fwd=1918/1910 wbb=806/812 wbbsnp=64/57 l2wbuf=1756 mwait=815
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500236000 (1ps)
+### Running  tb_coherence_bus seed 2 ###
+COHERENCE seed=2 cycles=50000 loads=3854 stores=3855 bus_txn=6229 c2c=970 l1miss=1911/1915 upgr=353/356 wb=846/841 inval=350/324 l2hit=2334 l2miss=4039 l2wb=2060 errors=0
+PREFETCH pf=5/2 pfhit=0/0 pfkill=0/0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37686 n_wait=56191 fwd=2264/2271 wbb=979/1008 wbbsnp=133/167 l2wbuf=2060 mwait=856
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500946000 (1ps)
+### Running  tb_coherence_bus seed 2 sparse ###
+COHERENCE seed=12 cycles=50000 loads=3321 stores=3379 bus_txn=6090 c2c=784 l1miss=1516/1471 upgr=424/426 wb=801/755 inval=312/308 l2hit=2238 l2miss=3625 l2wb=1800 errors=0
+PREFETCH pf=365/332 pfhit=189/190 pfkill=99/77
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=36233 n_wait=34956 fwd=1940/1897 wbb=865/810 wbbsnp=64/55 l2wbuf=1800 mwait=766
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500296000 (1ps)
+### Running  tb_coherence_bus seed 3 ###
+COHERENCE seed=3 cycles=50000 loads=3955 stores=3852 bus_txn=6284 c2c=956 l1miss=1951/1912 upgr=345/382 wb=847/842 inval=314/313 l2hit=2445 l2miss=3913 l2wb=2020 errors=0
+PREFETCH pf=3/2 pfhit=1/0 pfkill=0/0
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37540 n_wait=56236 fwd=2296/2294 wbb=999/998 wbbsnp=152/156 l2wbuf=2020 mwait=802
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500646000 (1ps)
+### Running  tb_coherence_bus seed 3 sparse ###
+COHERENCE seed=13 cycles=50000 loads=3268 stores=3323 bus_txn=5977 c2c=798 l1miss=1485/1475 upgr=415/418 wb=738/755 inval=313/299 l2hit=2177 l2miss=3629 l2wb=1776 errors=0
+PREFETCH pf=344/347 pfhit=188/175 pfkill=96/98
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35902 n_wait=34811 fwd=1900/1893 wbb=802/816 wbbsnp=64/61 l2wbuf=1776 mwait=826
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500236000 (1ps)
+### Running  tb_coherence_bus seed 4 ###
+COHERENCE seed=4 cycles=50000 loads=3837 stores=3785 bus_txn=6237 c2c=898 l1miss=1921/1890 upgr=335/371 wb=862/853 inval=311/320 l2hit=2337 l2miss=4013 l2wb=2042 errors=0
+PREFETCH pf=2/3 pfhit=0/1 pfkill=0/1
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=37665 n_wait=56191 fwd=2256/2261 wbb=1011/992 wbbsnp=149/139 l2wbuf=2042 mwait=820
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500936000 (1ps)
+### Running  tb_coherence_bus seed 4 sparse ###
+COHERENCE seed=14 cycles=50000 loads=3335 stores=3292 bus_txn=5964 c2c=802 l1miss=1448/1499 upgr=421/408 wb=731/756 inval=291/285 l2hit=2199 l2miss=3593 l2wb=1748 errors=0
+PREFETCH pf=356/345 pfhit=185/176 pfkill=101/93
+BUSR12 fast=1 fwd=1 wbb=1 wbuf=1 n_busy=35564 n_wait=33985 fwd=1869/1907 wbb=788/816 wbbsnp=57/60 l2wbuf=1748 mwait=810
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500176000 (1ps)
+### Running  tb_codex_r24_bus_edges ###
+PASS FAST bus registers reset
+PASS WBUF registers reset
+PASS snooped M flush is captured
+PASS FAST completion returns flush_line, not l2_rline
+PASS other master blocked in FAST gap
+PASS other master granted after gap
+PASS second master completes
+PASS UPGR granted
+PASS UPGR FAST completion timing
+PASS FAST L2_LAT=1 decides in request cycle
+PASS FAST L2_LAT=2 does not finish too early
+PASS FAST L2_LAT=2 finishes second cycle
+PASS write miss enters MWAIT
+PASS MWAIT exits through LOOK/lookup retry
+PASS dirty victim posted after wait
+PASS write miss installs and starts write behind
+RESULT: CODEX R24 BUS EDGES PASSED
+tb_codex_r24_bus_edges.v:124: $finish called at 166000 (1ps)
+### Running  tb_codex_r24_wbb_races ###
+PASS s_block prevents park when other core snoops victim
+PASS snooped victim was not duplicated in WBB
+PASS post-race load sees other core store
+PASS dirty D parked
+PASS other demand consumes parked owner before background drain
+PASS consumed-buffer line is not stale
+RESULT: CODEX R24 WBB RACES PASSED
+tb_codex_r24_wbb_races.v:84: $finish called at 596000 (1ps)
+### Running  tb_coherence_wbb seed 5 ###
+COHERENCE seed=5 cycles=50000 loads=2616 stores=2614 bus_txn=4197 c2c=645 l1miss=1299/1282 upgr=250/236 wb=549/581 inval=228/203 l2hit=1563 l2miss=2148 l2wb=1379 errors=0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=0 n_busy=37460 n_wait=53062 fwd=0/0 wbb=657/674 wbbsnp=108/93 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500536000 (1ps)
+### Running  tb_coherence_wbb seed 6 ###
+COHERENCE seed=6 cycles=50000 loads=2652 stores=2614 bus_txn=4192 c2c=619 l1miss=1277/1289 upgr=243/246 wb=575/562 inval=210/206 l2hit=1581 l2miss=2122 l2wb=1362 errors=0
+BUSR12 fast=0 fwd=0 wbb=1 wbuf=0 n_busy=37446 n_wait=53065 fwd=0/0 wbb=672/664 wbbsnp=97/102 l2wbuf=0 mwait=0
+RESULT: COHERENCE PASSED
+tb_coherence.v:237: $finish called at 500236000 (1ps)
 ### Running  tb_hw_sem seed 1 ###
 HW_SEM seed=1 cycles=50000 critical_sections=9333 acq=9334 spin=3873
 RESULT: HW_SEM PASSED
@@ -778,6 +1060,10 @@ RESULT: BRNEW PASSED
 RESULT: CODEX BRNEW EDGES PASSED
 RESULT: L1I PREFETCH PASSED
 RESULT: L1D PREFETCH PASSED
+RESULT: VERIFY R11 DPF PASSED
+RESULT: VERIFY R11 DPF PASSED
+RESULT: VERIFY R11 DPF PASSED
+RESULT: VERIFY R11 DPF PASSED
 RESULT: CODEX R22 IPF EDGES PASSED
 RESULT: CODEX R22 DPF EDGES PASSED
 RESULT: L1D PREFETCH PASSED
@@ -796,6 +1082,27 @@ RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: BUSLAT PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: COHERENCE PASSED
+RESULT: CODEX R24 BUS EDGES PASSED
+RESULT: CODEX R24 WBB RACES PASSED
 RESULT: COHERENCE PASSED
 RESULT: COHERENCE PASSED
 RESULT: HW_SEM PASSED

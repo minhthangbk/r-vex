@@ -34,13 +34,27 @@
 // While the cache's own prefetch owns the bus, core hits still complete
 // (no snoop can arrive then and the fill writes only the buffer).
 // DPF = 0 is the r10 cache, cycle for cycle.
+//
+// FWD = 1 (2026-11-04 r12, reviews/contracts/bus.md FWD-01/02): a demand
+// RD/RDX/UPGR completes the core access in its completion cycle (the load
+// reads the arriving line, a store is merged into it), one cycle earlier.
+// WBB = 1 (bus.md WBB-01..06): one-line write-back buffer. A demand miss with
+// a dirty victim parks the victim in the buffer, frees the slot and presents
+// its RD/RDX in the same cycle; the buffer drains with a WB when the cache
+// has no demand miss (background class on the bus), or first, as a demand,
+// when the core touches the buffered line or a second dirty victim needs the
+// buffer. The buffer is the owner copy: a snooped RD/RDX of its line gets
+// its data (flush to L2) and empties it.
+// FWD = WBB = 0 is the r11 cache, cycle for cycle.
 //======================================================================
 module l1d_cache #(
     parameter AW   = 16,          // physical byte-address bits
     parameter SETS = 64,          // lines (power of two)
     parameter DPF      = 0,       // prefetch buffer lines (0 = no prefetch)
     parameter DPF_DEG  = 2,       // lines prefetched ahead of a stream
-    parameter DPF_HIST = 4        // demand-miss history entries (allocation filter)
+    parameter DPF_HIST = 4,       // demand-miss history entries (allocation filter)
+    parameter FWD      = 0,       // r12: forward the fill to the core in the completion cycle
+    parameter WBB      = 0        // r12: one-line write-back (victim) buffer
 ) (
     input  wire         clk,
     input  wire         reset,
@@ -91,6 +105,13 @@ module l1d_cache #(
     reg [31:0] n_hit, n_miss, n_wb, n_upgr, n_inval, n_flush;
     reg [31:0] n_pf, n_pfhit, n_pfkill;
     reg [31:0] n_pfuseless, n_pflate;   // valid entry overwritten unused / demand miss waited for its prefetch
+    reg [31:0] n_wbb, n_wbbsnp, n_fwd;  // r12: victims parked / buffer supplied a snoop / fills forwarded
+
+    // ---- write-back buffer (WBB) ----
+    reg          wv;                               // holds a dirty victim (owner copy)
+    reg [AW-5:0] wa;                               // its line address
+    reg [127:0]  wd;
+    reg          cur_wbb;                          // the granted transaction is the buffer's WB
 
     // ---- prefetch buffer (DPF) ----
     reg          pv [0:NP-1];                      // line data valid
@@ -115,24 +136,34 @@ module l1d_cache #(
     wire [TW-1:0] s_tag   = s_addr[AW-1:4+IW];
     wire          s_match = s_valid && (s_op != OP_WB) &&
                             (st[s_idx] != ST_I) && (tg[s_idx] == s_tag);
-    assign s_hit_m = s_match && (st[s_idx] == ST_M);
-    assign s_line  = {dat[s_idx*4+3], dat[s_idx*4+2], dat[s_idx*4+1], dat[s_idx*4+0]};
+    assign s_hit_m = (s_match && (st[s_idx] == ST_M)) || s_wbb;
+    assign s_line  = s_wbb ? wd : {dat[s_idx*4+3], dat[s_idx*4+2], dat[s_idx*4+1], dat[s_idx*4+0]};
     wire   s_block = s_match && (s_idx == c_idx);    // hold the core this cycle
     wire [LA-1:0] c_line = c_addr[AW-1:4];
     wire [LA-1:0] s_la   = s_addr[AW-1:4];
     wire          s_kill = s_valid && (s_op == OP_RDX || s_op == OP_UPGR);
+    // WBB-02: the buffered victim answers a snooped RD/RDX like an M line
+    wire          s_wbb  = (WBB > 0) && wv && s_valid && (s_op != OP_WB) && s_la == wa;
 
     // ---- miss engine ----
     reg        busy;                  // granted, waiting for b_done
     reg [1:0]  cur_op;
     reg [AW-1:0] cur_addr;
 
+    // FWD-01/02: the access whose own demand RD/RDX/UPGR completes this cycle
+    wire   fwd     = (FWD > 0) && busy && b_done && !cur_pf && !cur_wbb && c_req &&
+                     cur_addr[AW-1:4] == c_line &&
+                     (cur_op == OP_RDX || cur_op == OP_UPGR || (cur_op == OP_RD && !c_we));
+    wire [127:0] fwd_line = b_rline;
     // DPF-07: hits go on while the cache's own prefetch owns the bus
-    assign c_ready = c_req && c_ok && (!busy || cur_pf) && !s_block;
-    assign c_rdata = dat[c_idx*4 + c_off];
+    assign c_ready = (c_req && c_ok && (!busy || cur_pf) && !s_block) || fwd;
+    assign c_rdata = (fwd && cur_op != OP_UPGR) ? fwd_line[32*c_off +: 32] : dat[c_idx*4 + c_off];
 
     wire need   = c_req && !c_ok && !busy;
     wire dirty_victim = !c_hit && (st[c_idx] == ST_M);
+    // WBB: own access to the buffered line / park the dirty victim this cycle (WBB-01, WBB-06)
+    wire wbb_c   = (WBB > 0) && wv && wa == c_line;
+    wire park_ok = (WBB > 0) && !wv && !s_block;
 
     // buffer lookup of the demand line, and the first pending entry
     reg          bh, pq;
@@ -165,18 +196,28 @@ module l1d_cache #(
     // DPF-05: install from the buffer (no bus) when the victim is clean and no
     // RDX/UPGR of the line is granted to another cache this cycle
     wire buf_use = need && !c_hit && bh;                 // the miss is the buffer's
-    wire inst    = buf_use && !dirty_victim && !(s_kill && s_la == c_line) && !s_block;
-    wire dreq    = need && !(buf_use && !dirty_victim);  // demand transaction on the bus
-    // DPF-07: a prefetch RD only when the core has no demand miss
-    wire preq    = (DPF > 0) && !busy && !need && pq && !p_cached;
-    wire pf_sel  = !dreq && preq;
-    assign b_req  = dreq || preq;
-    assign b_pf   = pf_sel;
-    assign b_op   = pf_sel           ? OP_RD   :
-                    (c_hit && c_we)  ? OP_UPGR :
-                    dirty_victim     ? OP_WB   :
-                    c_we             ? OP_RDX  : OP_RD;
+    // WBB-05: with a free write-back buffer a dirty victim is parked and the buffered line installed
+    wire inst    = buf_use && (!dirty_victim || park_ok) && !(s_kill && s_la == c_line) && !s_block;
+    wire dreq    = need && !(buf_use && (!dirty_victim || ((WBB > 0) && !wv)));  // demand transaction on the bus
+    // WBB-03: the buffer is written back first (demand class) when the core touches its line or a
+    // second dirty victim needs it; WBB-04: otherwise it drains when the cache has no demand miss
+    wire wdr_dem = (WBB > 0) && wv && need && (wbb_c || dirty_victim);
+    wire wdr_bg  = (WBB > 0) && wv && !busy && !need;
+    wire wsel    = dreq ? wdr_dem : wdr_bg;              // the presented request is the buffer's WB
+    wire park    = need && dirty_victim && park_ok && !wbb_c;   // WBB-01 (also with a buffer install)
+    // DPF-07: a prefetch RD only when the core has no demand miss (WBB-05: never of the buffered line)
+    wire p_wbb   = (WBB > 0) && wv && wa == p_line;
+    wire preq    = (DPF > 0) && !busy && !need && pq && !p_cached && !p_wbb;
+    wire pf_sel  = !dreq && !wdr_bg && preq;
+    assign b_req  = dreq || wdr_bg || preq;
+    assign b_pf   = pf_sel || (!dreq && wdr_bg);
+    assign b_op   = (pf_sel)          ? OP_RD   :
+                    (wsel)            ? OP_WB   :
+                    (c_hit && c_we)   ? OP_UPGR :
+                    (dirty_victim && !park) ? OP_WB :
+                    c_we              ? OP_RDX  : OP_RD;
     assign b_addr = pf_sel ? {p_line, 4'b0} :
+                    wsel   ? {wa, 4'b0} :
                     (b_op == OP_WB) ? {tg[c_idx], c_idx, 4'b0} : {c_tag, c_idx, 4'b0};
 
     // DPF-06: allocation filter (line L-1 among the last DPF_HIST demand misses)
@@ -188,9 +229,10 @@ module l1d_cache #(
         begin
             have = (st[x[IW-1:0]] != ST_I) && (tg[x[IW-1:0]] == x[LA-1:IW]);
             for (q = 0; q < NP; q = q + 1) if ((pv[q] || pp[q]) && pa[q] == x) have = 1'b1;
+            if ((WBB > 0) && wv && wa == x) have = 1'b1;   // WBB-05
         end
     endfunction
-    assign b_wline = {dat[c_idx*4+3], dat[c_idx*4+2], dat[c_idx*4+1], dat[c_idx*4+0]};
+    assign b_wline = wsel ? wd : {dat[c_idx*4+3], dat[c_idx*4+2], dat[c_idx*4+1], dat[c_idx*4+0]};
 
     wire [IW-1:0] cur_idx = cur_addr[4+IW-1:4];
     wire [TW-1:0] cur_tag = cur_addr[AW-1:4+IW];
@@ -202,13 +244,22 @@ module l1d_cache #(
             busy <= 1'b0; cur_op <= OP_RD; cur_addr <= {AW{1'b0}};
             n_hit <= 0; n_miss <= 0; n_wb <= 0; n_upgr <= 0; n_inval <= 0; n_flush <= 0;
             n_pf <= 0; n_pfhit <= 0; n_pfkill <= 0; n_pfuseless <= 0; n_pflate <= 0; rp <= 0; cur_pf <= 1'b0; cur_pb <= 0;
+            n_wbb <= 0; n_wbbsnp <= 0; n_fwd <= 0; wv <= 1'b0; wa <= {(AW-4){1'b0}}; cur_wbb <= 1'b0;
             for (k = 0; k < NP; k = k + 1) begin pv[k] <= 1'b0; pp[k] <= 1'b0; pa[k] <= {LA{1'b0}}; end
             for (k = 0; k < NH; k = k + 1) begin hv[k] <= 1'b0; hist[k] <= {LA{1'b0}}; end
         end else begin
             // core hit: store data / count
             if (c_ready) begin
-                n_hit <= n_hit + 1;
+                if (fwd) n_fwd <= n_fwd + 1; else n_hit <= n_hit + 1;
                 if (c_we) dat[c_idx*4 + c_off] <= c_wdata;
+            end
+            // WBB-02: a snooped RD/RDX took the buffered line (the bus writes it to L2)
+            if (s_wbb) begin wv <= 1'b0; n_wbbsnp <= n_wbbsnp + 1; end
+            // WBB-01: park the dirty victim and free its slot (an install below overrides the state)
+            if (park) begin
+                wv <= 1'b1; wa <= {tg[c_idx], c_idx}; n_wbb <= n_wbb + 1;
+                wd <= {dat[c_idx*4+3], dat[c_idx*4+2], dat[c_idx*4+1], dat[c_idx*4+0]};
+                st[c_idx] <= ST_I;
             end
             // snoop state change (another cache's transaction)
             if (s_match) begin
@@ -234,8 +285,11 @@ module l1d_cache #(
             // a pending entry whose line got cached is dropped
             if (DPF > 0 && !busy && !need && pq && p_cached) pp[pqi] <= 1'b0;
             // own transaction
+            // a pending entry of the buffered line is dropped (WBB-05)
+            if (DPF > 0 && !busy && !need && pq && p_wbb) pp[pqi] <= 1'b0;
             if (b_gnt) begin
                 busy <= 1'b1; cur_op <= b_op; cur_addr <= b_addr; cur_pf <= pf_sel; cur_pb <= pqi;
+                cur_wbb <= wsel;
                 if (pf_sel) begin pp[pqi] <= 1'b0; n_pf <= n_pf + 1; end
                 else if (b_op == OP_WB) n_wb <= n_wb + 1;
                 else if (b_op == OP_UPGR) n_upgr <= n_upgr + 1;
@@ -263,6 +317,8 @@ module l1d_cache #(
                 busy <= 1'b0; cur_pf <= 1'b0;
                 if (c_req && !c_ok && cur_addr[AW-1:4] == c_line) n_pflate <= n_pflate + 1;
                 pd[cur_pb] <= b_rline; pv[cur_pb] <= 1'b1;
+            end else if (busy && b_done && cur_wbb) begin
+                busy <= 1'b0; cur_wbb <= 1'b0; wv <= 1'b0;      // WBB-04: buffer written back
             end else if (busy && b_done) begin
                 busy <= 1'b0;
                 case (cur_op)
@@ -275,6 +331,7 @@ module l1d_cache #(
                         dat[cur_idx*4+1] <= b_rline[63:32];
                         dat[cur_idx*4+2] <= b_rline[95:64];
                         dat[cur_idx*4+3] <= b_rline[127:96];
+                        if (fwd && c_we) dat[cur_idx*4 + c_off] <= c_wdata;   // FWD-01: store merged
                     end
                 endcase
             end
@@ -288,6 +345,7 @@ module l1d_cache #(
         begin
             i = a[4+IW-1:4]; t = a[AW-1:4+IW];
             if (st[i] == ST_M && tg[i] == t) peek_m = {1'b1, dat[i*4 + a[3:2]]};
+            else if ((WBB > 0) && wv && wa == a[AW-1:4]) peek_m = {1'b1, wd[32*a[3:2] +: 32]};   // WBB-02
             else peek_m = 33'd0;
         end
     endfunction

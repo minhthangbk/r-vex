@@ -12,12 +12,16 @@
 //   * DPF > 0 (r11, prefetch.md DPF-03/04): every valid prefetch-buffer
 //     line equals golden, every cycle; half of the requests walk to the next
 //     word, so sequential line misses (the prefetch trigger) are common.
+//   * r12 (bus.md): FAST/FWD/WBB/WBUF parameters; the write-back buffer line
+//     equals golden and is in no array or prefetch buffer; GAP rule of the
+//     bus (BUS-03). WBB also walks, so parked victims are touched again.
 // +SEED=n +CYCLES=n [+SPARSE]
 //======================================================================
 `timescale 1ns/1ps
 module tb_coherence;
     localparam AW = 16, L1S = 4, L2S = 8, NW = 64;   // NW words = 16 lines
     parameter DPF = 0, DPF_DEG = 2, DPF_HIST = 4;    // L1D prefetch (r11, prefetch.md DPF-03)
+    parameter FAST = 0, FWD = 0, WBB = 0, WBUF = 0;  // r12 bus latency / write buffers (bus.md BUS-02)
     reg clk = 0, reset = 1;
     always #5 clk = ~clk;
 
@@ -40,7 +44,8 @@ module tb_coherence;
 
     genvar g;
     generate for (g = 0; g < 2; g = g + 1) begin : c
-        l1d_cache #(.AW(AW), .SETS(L1S), .DPF(DPF), .DPF_DEG(DPF_DEG), .DPF_HIST(DPF_HIST)) l1d (
+        l1d_cache #(.AW(AW), .SETS(L1S), .DPF(DPF), .DPF_DEG(DPF_DEG), .DPF_HIST(DPF_HIST),
+                    .FWD(FWD), .WBB(WBB)) l1d (
             .clk(clk), .reset(reset),
             .c_req(c_req[g]), .c_we(c_we[g]), .c_addr(c_addr[g]), .c_wdata(c_wdata[g]),
             .c_rdata(c_rdata[g]), .c_ready(c_ready[g]),
@@ -49,14 +54,14 @@ module tb_coherence;
             .b_rline(b_rline), .s_valid(s_valid[g]), .s_op(s_op), .s_addr(s_addr),
             .s_hit_m(s_hit_m[g]), .s_line(s_line[128*g +: 128]));
     end endgenerate
-    coh_bus #(.N(2), .AW(AW)) bus (
+    coh_bus #(.N(2), .AW(AW), .FAST(FAST)) bus (
         .clk(clk), .reset(reset),
         .m_req(b_req), .m_pf(b_pf), .m_op(b_op), .m_addr(b_addr), .m_wline(b_wline),
         .m_gnt(b_gnt), .m_done(b_done), .m_rline(b_rline),
         .s_valid(s_valid), .s_op(s_op), .s_addr(s_addr), .s_hit_m(s_hit_m), .s_line(s_line),
         .l2_req(l2_req), .l2_we(l2_we), .l2_addr(l2_addr), .l2_wline(l2_wline),
         .l2_done(l2_done), .l2_rline(l2_rline));
-    l2_cache #(.AW(AW), .SETS(L2S), .L2_LAT(3), .MEM_LAT(7)) l2 (
+    l2_cache #(.AW(AW), .SETS(L2S), .L2_LAT(3), .MEM_LAT(7), .FAST(FAST), .WBUF(WBUF)) l2 (
         .clk(clk), .reset(reset), .req(l2_req), .we(l2_we), .addr(l2_addr),
         .wline(l2_wline), .done(l2_done), .rline(l2_rline));
 
@@ -112,6 +117,34 @@ module tb_coherence;
                             errors = errors + 1;
                         end
                     end
+            // WBB-02 (r12, bus.md): the write-back buffer holds the owner copy: its data equals golden,
+            // its line is in no array (neither cache) and in no prefetch buffer
+            for (t = 0; t < 2; t = t + 1)
+                if (WBB > 0 && (t == 0 ? c[0].l1d.wv : c[1].l1d.wv)) begin
+                    la = {(t == 0 ? c[0].l1d.wa : c[1].l1d.wa), 4'b0};
+                    for (ww = 0; ww < 4; ww = ww + 1) begin
+                        a = ((la + 4 * ww) - 16'h1000) >> 2;
+                        if (la >= 16'h1000 && a < NW &&
+                            ((t == 0 ? c[0].l1d.wd : c[1].l1d.wd) >> (32 * ww)) % 33'h100000000 !== golden[a]) begin
+                            $display("WBB DATA VIOLATION cyc=%0d cache=%0d word=%0d", cyc, t, ww);
+                            errors = errors + 1;
+                        end
+                    end
+                    if ((c[0].l1d.st[la[5:4]] != 0 && c[0].l1d.tg[la[5:4]] == la[15:6]) ||
+                        (c[1].l1d.st[la[5:4]] != 0 && c[1].l1d.tg[la[5:4]] == la[15:6])) begin
+                        $display("WBB EXCLUSION VIOLATION cyc=%0d cache=%0d (line in an array)", cyc, t);
+                        errors = errors + 1;
+                    end
+                    for (s = 0; s < DPF; s = s + 1)
+                        if ((c[0].l1d.pv[s] && c[0].l1d.pa[s] == la[15:4]) ||
+                            (c[1].l1d.pv[s] && c[1].l1d.pa[s] == la[15:4])) begin
+                            $display("WBB EXCLUSION VIOLATION cyc=%0d cache=%0d (line in a prefetch buffer)", cyc, t);
+                            errors = errors + 1;
+                        end
+                end
+            if (WBB > 0 && c[0].l1d.wv && c[1].l1d.wv && c[0].l1d.wa == c[1].l1d.wa) begin
+                $display("WBB SWMR VIOLATION cyc=%0d", cyc); errors = errors + 1;
+            end
             // DPF-03: a valid buffered line is never stale
             for (t = 0; t < 2; t = t + 1)
                 for (s = 0; s < DPF; s = s + 1)
@@ -150,7 +183,7 @@ module tb_coherence;
             for (p = 0; p < 2; p = p + 1)
                 if (cyc < ncyc && !c_req[p] && (sparse ? ($random(seed) & 7) == 0 : ($random(seed) & 3) != 0)) begin
                     w = {$random(seed)} % NW;
-                    if (DPF > 0 && ($random(seed) & 1)) w = (lastw[p] + 1) % NW;   // walk
+                    if ((DPF > 0 || WBB > 0) && ($random(seed) & 1)) w = (lastw[p] + 1) % NW;   // walk
                     lastw[p] = w;
                     c_req[p] = 1; c_we[p] = $random(seed) & 1;
                     c_addr[p] = waddr(w); c_wdata[p] = $random(seed);
@@ -175,6 +208,8 @@ module tb_coherence;
         end
         // (a pending prefetch presents b_req, so the loop also waits for the prefetch buffers)
         if (c_req != 0 || bus.busy || |b_req) begin $display("DRAIN TIMEOUT"); errors = errors + 1; end
+        // WBB-04 (r12): with no demand the write-back buffers drain
+        if (WBB > 0 && (c[0].l1d.wv || c[1].l1d.wv)) begin $display("WBB NOT DRAINED"); errors = errors + 1; end
         // final: coherent view == golden
         for (k = 0; k < NW; k = k + 1) begin
             pm0 = c[0].l1d.peek_m(waddr(k));
@@ -194,6 +229,9 @@ module tb_coherence;
             $display("PREFETCH pf=%0d/%0d pfhit=%0d/%0d pfkill=%0d/%0d",
                      c[0].l1d.n_pf, c[1].l1d.n_pf, c[0].l1d.n_pfhit, c[1].l1d.n_pfhit,
                      c[0].l1d.n_pfkill, c[1].l1d.n_pfkill);
+        $display("BUSR12 fast=%0d fwd=%0d wbb=%0d wbuf=%0d n_busy=%0d n_wait=%0d fwd=%0d/%0d wbb=%0d/%0d wbbsnp=%0d/%0d l2wbuf=%0d mwait=%0d",
+                 FAST, FWD, WBB, WBUF, bus.n_busy, bus.n_wait, c[0].l1d.n_fwd, c[1].l1d.n_fwd,
+                 c[0].l1d.n_wbb, c[1].l1d.n_wbb, c[0].l1d.n_wbbsnp, c[1].l1d.n_wbbsnp, l2.n_wbuf, l2.n_mwait);
         if (errors == 0) $display("RESULT: COHERENCE PASSED");
         else $display("RESULT: COHERENCE FAILED");
         $finish;
@@ -203,6 +241,22 @@ module tb_coherence;
         $display("T%0d req=%b/%b we=%b%b a0=%h a1=%h rdy=%b breq=%b gnt=%b done=%b busy=%b op0=%0d op1=%0d st1[%0d]=%0d tg=%h busy1=%b",
                  cyc, c_req[0], c_req[1], c_we[0], c_we[1], c_addr[0], c_addr[1], c_ready, b_req, b_gnt, b_done,
                  bus.busy, b_op[1:0], b_op[3:2], c_addr[1][5:4], c[1].l1d.st[c_addr[1][5:4]], c[1].l1d.tg[c_addr[1][5:4]], c[1].l1d.busy);
+
+    // BUS-03 (r12): no grant in a completion cycle; in the gap cycle after it only the master that
+    // just finished (FAST) or none (FAST = 0)
+    reg [1:0] done_q;
+    always @(posedge clk) if (!reset) begin
+        if (|b_gnt && |b_done) begin
+            $display("GAP VIOLATION cyc=%0d grant in the done cycle gnt=%b done=%b", cyc, b_gnt, b_done);
+            errors = errors + 1;
+        end
+        if (|b_gnt && |done_q && (FAST == 0 || (b_gnt & ~done_q) != 0)) begin
+            $display("GAP VIOLATION cyc=%0d gnt=%b after done=%b", cyc, b_gnt, done_q);
+            errors = errors + 1;
+        end
+        done_q <= b_done;
+    end
+    initial done_q = 0;
 
     // DPF-09 (r11): a prefetch is never granted while the other cache presents a demand request
     always @(posedge clk) if (!reset)

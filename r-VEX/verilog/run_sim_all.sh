@@ -20,6 +20,7 @@
 #   tb_brnew      brn/brfn: branch on the BR written in its own packet (reviews/contracts/brnew.md)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds; + 6 seeds with DPF = 4)
 #   tb_l1i_pf / tb_l1d_pf  cache prefetch, directed (reviews/contracts/prefetch.md)
+#   tb_bus_lat    r12 bus latency / write buffers, directed timing (reviews/contracts/bus.md); tb_coherence_bus
 #   tb_hw_sem     constrained-random hardware semaphores (4 seeds)
 set -e
 export PATH="/f/APPs/iverilog/bin:$PATH"
@@ -106,6 +107,48 @@ for seed in 3 5 7 8; do
     echo "### Running  tb_coherence_pf DEG=1 seed $seed sparse ###" | tee -a "$LOG"
     vvp tb_coherence_pf1.vvp +SEED=$seed +CYCLES=50000 +SPARSE | tee -a "$LOG"
 done
+
+# r12 bus latency and write buffers (reviews/contracts/bus.md): directed timing over FAST FWD WBB WBUF (DPF)
+for c in "0 0 0 0 0" "1 0 0 0 0" "1 1 0 0 0" "0 0 1 0 0" "0 0 0 1 0" "1 1 1 0 0" "1 1 1 1 0" "1 1 1 1 4" "0 0 1 0 4"; do
+    set -- $c
+    iverilog -g2012 -I . -Ptb_bus_lat.FAST=$1 -Ptb_bus_lat.FWD=$2 -Ptb_bus_lat.WBB=$3 -Ptb_bus_lat.WBUF=$4 -Ptb_bus_lat.DPF=$5 \
+        -o tb_bus_lat.vvp l1d_cache.v coh_bus.v l2_cache.v tb_bus_lat.v
+    echo "### Running  tb_bus_lat FAST=$1 FWD=$2 WBB=$3 WBUF=$4 DPF=$5 ###" | tee -a "$LOG"
+    vvp tb_bus_lat.vvp | tee -a "$LOG"
+done
+# random MSI with every r12 feature (+ DPF = 4, DEG 1 = the rvex_system defaults), dense and sparse,
+# and the write-back buffer alone
+iverilog -g2012 -I . -Ptb_coherence.FAST=1 -Ptb_coherence.FWD=1 -Ptb_coherence.WBB=1 -Ptb_coherence.WBUF=1 \
+    -Ptb_coherence.DPF=4 -Ptb_coherence.DPF_DEG=1 -o tb_coherence_bus.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+for seed in 1 2 3 4; do
+    echo "### Running  tb_coherence_bus seed $seed ###" | tee -a "$LOG"
+    vvp tb_coherence_bus.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+    echo "### Running  tb_coherence_bus seed $seed sparse ###" | tee -a "$LOG"
+    vvp tb_coherence_bus.vvp +SEED=$((seed + 10)) +CYCLES=50000 +SPARSE | tee -a "$LOG"
+done
+# Codex R24: bus/L2 edges (flush data, gap fairness, L2_LAT 1/2, WBUF write miss) and WBB races
+for t in tb_codex_r24_bus_edges tb_codex_r24_wbb_races; do
+    iverilog -g2012 -I . -o $t.vvp l1d_cache.v coh_bus.v l2_cache.v $t.v
+    echo "### Running  $t ###" | tee -a "$LOG"
+    vvp $t.vvp | sed 's/TIMEOUT/TIMEOUT FAILED/' | tee -a "$LOG"
+done
+iverilog -g2012 -I . -Ptb_coherence.WBB=1 -o tb_coherence_wbb.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+for seed in 5 6; do
+    echo "### Running  tb_coherence_wbb seed $seed ###" | tee -a "$LOG"
+    vvp tb_coherence_wbb.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"
+done
+
+# final verify r12: two-core write-back-buffer races swept over start offsets (tb_verify_r12_wbb.v)
+iverilog -g2012 -I . -o tb_verify_r12_wbb.vvp l1d_cache.v coh_bus.v l2_cache.v tb_verify_r12_wbb.v
+echo "### Running  tb_verify_r12_wbb ###" | tee -a "$LOG"
+vvp tb_verify_r12_wbb.vvp | tee -a "$LOG"
+# final verify r12 F4 (bus.md BUS-02): every FAST/FWD/WBB/WBUF combination x DPF 0/4, one seed each
+for f in 0 1; do for w in 0 1; do for b in 0 1; do for u in 0 1; do for d in 0 4; do
+    iverilog -g2012 -I . -Ptb_coherence.FAST=$f -Ptb_coherence.FWD=$w -Ptb_coherence.WBB=$b -Ptb_coherence.WBUF=$u \
+        -Ptb_coherence.DPF=$d -Ptb_coherence.DPF_DEG=1 -o tb_coherence_cmb.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+    echo "### Running  tb_coherence FAST=$f FWD=$w WBB=$b WBUF=$u DPF=$d ###" | tee -a "$LOG"
+    vvp tb_coherence_cmb.vvp +SEED=$((40 + f + 2*w + 4*b + 8*u + d)) +CYCLES=20000 | tee -a "$LOG"
+done; done; done; done; done
 
 # hardware semaphores (hw_sem.v): mutual exclusion + non-atomic RMW + starvation, 4 seeds
 iverilog -g2012 -I . -o tb_hw_sem.vvp hw_sem.v tb_hw_sem.v
