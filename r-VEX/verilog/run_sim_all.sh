@@ -127,7 +127,8 @@ for seed in 1 2 3 4; do
     vvp tb_coherence_bus.vvp +SEED=$((seed + 10)) +CYCLES=50000 +SPARSE | tee -a "$LOG"
 done
 # Codex R24: bus/L2 edges (flush data, gap fairness, L2_LAT 1/2, WBUF write miss) and WBB races
-for t in tb_codex_r24_bus_edges tb_codex_r24_wbb_races; do
+# Codex R29 (round r14): DPF read sourced from the peer M line; L2 dirty victim posted while a newer M copy lives
+for t in tb_codex_r24_bus_edges tb_codex_r24_wbb_races tb_codex_r29_pf_m tb_codex_r29_l2_mvictim; do
     iverilog -g2012 -I . -o $t.vvp l1d_cache.v coh_bus.v l2_cache.v $t.v
     echo "### Running  $t ###" | tee -a "$LOG"
     vvp $t.vvp | sed 's/TIMEOUT/TIMEOUT FAILED/' | tee -a "$LOG"
