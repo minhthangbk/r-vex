@@ -153,6 +153,21 @@ for f in 0 1; do for w in 0 1; do for b in 0 1; do for u in 0 1; do for d in 0 4
 done; done; done; done; done
 
 # hardware semaphores (hw_sem.v): mutual exclusion + non-atomic RMW + starvation, 4 seeds
+# r18 (ppa.md PPA-14, BUG-187/190): full-size caches (tag width 0), accesses above the 64 KB space with FWD=0,
+# and tb_coherence (Codex R36 F2: data checks for any L1S) on 2-set and 4096-set L1s
+T=tb_codex_r36_fullsize
+for g in "-P$T.L1S=4096 -P$T.L2S=4096 -P$T.FAST=0 -P$T.FWD=0 -P$T.WBB=0 -P$T.WBUF=0 -P$T.DPF=0|+HIGH" "-P$T.L1S=4096 -P$T.L2S=2|" "-P$T.L1S=2 -P$T.L2S=4096|"; do
+    iverilog -g2012 -I . ${g%%|*} -o $T.vvp l1d_cache.v coh_bus.v l2_cache.v $T.v
+    echo "### Running  $T ${g%%|*} ###" | tee -a "$LOG"
+    vvp $T.vvp ${g##*|} | tee -a "$LOG"
+done
+for g in "2 16 64" "4096 4096 128"; do
+    set -- $g
+    iverilog -g2012 -I . -Ptb_coherence.L1S=$1 -Ptb_coherence.L2S=$2 -Ptb_coherence.NW=$3 -Ptb_coherence.DPF=4 -Ptb_coherence.DPF_DEG=1 \
+        -Ptb_coherence.FAST=1 -Ptb_coherence.WBB=1 -o tb_coherence_geo.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+    echo "### Running  tb_coherence L1S=$1 L2S=$2 ###" | tee -a "$LOG"
+    vvp tb_coherence_geo.vvp +SEED=7 +CYCLES=30000 | tee -a "$LOG"
+done
 iverilog -g2012 -I . -o tb_hw_sem.vvp hw_sem.v tb_hw_sem.v
 for seed in 1 2 3 4; do
     echo "### Running  tb_hw_sem seed $seed ###" | tee -a "$LOG"

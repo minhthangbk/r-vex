@@ -47,7 +47,12 @@ module l2_cache #(
     initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
         $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
     end
-    localparam TW = AW - 4 - IW;
+    // BUG-187 (r18): a cache as large as the address space has no tag bits; TW is kept >= 1 and every tag is
+    // taken with a shift (always 0 then), so it elaborates and works; more sets than lines in memory is an error
+    localparam TW = (AW - 4 - IW > 0) ? AW - 4 - IW : 1;
+    initial if (AW - 4 - IW < 0) begin
+        $display("FATAL %m: SETS=%0d x 16 B is larger than the %0d-byte address space", SETS, 1 << AW); $finish;
+    end
 
     reg [31:0]   mem [0:(1<<(AW-2))-1];
     reg          vld [0:SETS-1];
@@ -72,7 +77,7 @@ module l2_cache #(
                           (FAST && L2_LAT == 1 && state == S_IDLE && req && !done);
 
     wire [IW-1:0] idx = addr[4+IW-1:4];
-    wire [TW-1:0] tag = addr[AW-1:4+IW];
+    wire [TW-1:0] tag = addr >> (4 + IW);
     wire          hit = vld[idx] && tg[idx] == tag;
     wire [AW-3:0] wa  = addr[AW-1:2];                 // word address of the line
     wire [AW-3:0] va  = {tg[idx], idx, 2'b00};        // victim word address
@@ -164,7 +169,7 @@ module l2_cache #(
         input [AW-1:0] a;
         reg [IW-1:0] i; reg [TW-1:0] t;
         begin
-            i = a[4+IW-1:4]; t = a[AW-1:4+IW];
+            i = a[4+IW-1:4]; t = a >> (4 + IW);
             if (vld[i] && tg[i] == t) peek = dat[i] >> (32 * a[3:2]);
             else peek = mem[a[AW-1:2]];
         end

@@ -88,7 +88,12 @@ module l1d_cache #(
     initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
         $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
     end
-    localparam TW = AW - 4 - IW;
+    // BUG-187 (r18): a cache as large as the address space has no tag bits; TW is kept >= 1 and every tag is
+    // taken with a shift (always 0 then), so it elaborates and works; more sets than lines in memory is an error
+    localparam TW = (AW - 4 - IW > 0) ? AW - 4 - IW : 1;
+    initial if (AW - 4 - IW < 0) begin
+        $display("FATAL %m: SETS=%0d x 16 B is larger than the %0d-byte address space", SETS, 1 << AW); $finish;
+    end
     localparam LA = AW - 4;                        // line address bits
     localparam NP = (DPF > 0) ? DPF : 1;
     localparam NH = (DPF_HIST > 0) ? DPF_HIST : 1;
@@ -126,14 +131,14 @@ module l1d_cache #(
 
     // ---- core lookup ----
     wire [IW-1:0] c_idx = c_addr[4+IW-1:4];
-    wire [TW-1:0] c_tag = c_addr[AW-1:4+IW];
+    wire [TW-1:0] c_tag = c_addr[AW-1:0] >> (4 + IW);   // Codex R36 F1: the core address is 32 bits; tag from the AW-bit space only
     wire [1:0]    c_off = c_addr[3:2];
     wire          c_hit = (st[c_idx] != ST_I) && (tg[c_idx] == c_tag);
     wire          c_ok  = c_hit && (!c_we || st[c_idx] == ST_M);
 
     // ---- snoop lookup ----
     wire [IW-1:0] s_idx   = s_addr[4+IW-1:4];
-    wire [TW-1:0] s_tag   = s_addr[AW-1:4+IW];
+    wire [TW-1:0] s_tag   = s_addr >> (4 + IW);
     wire          s_match = s_valid && (s_op != OP_WB) &&
                             (st[s_idx] != ST_I) && (tg[s_idx] == s_tag);
     assign s_hit_m = (s_match && (st[s_idx] == ST_M)) || s_wbb;
@@ -191,7 +196,7 @@ module l1d_cache #(
     end
     wire [LA-1:0] p_line = pa[pqi];
     wire [IW-1:0] p_idx  = p_line[IW-1:0];
-    wire [TW-1:0] p_tag  = p_line[LA-1:IW];
+    wire [TW-1:0] p_tag  = p_line >> IW;
     wire          p_cached = (st[p_idx] != ST_I) && (tg[p_idx] == p_tag);
     // DPF-05: install from the buffer (no bus) when the victim is clean and no
     // RDX/UPGR of the line is granted to another cache this cycle
@@ -227,7 +232,7 @@ module l1d_cache #(
         input [LA-1:0] x;
         integer q;
         begin
-            have = (st[x[IW-1:0]] != ST_I) && (tg[x[IW-1:0]] == x[LA-1:IW]);
+            have = (st[x[IW-1:0]] != ST_I) && (tg[x[IW-1:0]] == (x >> IW));
             for (q = 0; q < NP; q = q + 1) if ((pv[q] || pp[q]) && pa[q] == x) have = 1'b1;
             if ((WBB > 0) && wv && wa == x) have = 1'b1;   // WBB-05
         end
@@ -235,7 +240,7 @@ module l1d_cache #(
     assign b_wline = wsel ? wd : {dat[c_idx*4+3], dat[c_idx*4+2], dat[c_idx*4+1], dat[c_idx*4+0]};
 
     wire [IW-1:0] cur_idx = cur_addr[4+IW-1:4];
-    wire [TW-1:0] cur_tag = cur_addr[AW-1:4+IW];
+    wire [TW-1:0] cur_tag = cur_addr >> (4 + IW);
 
     integer k;
     always @(posedge clk) begin
@@ -343,7 +348,7 @@ module l1d_cache #(
         input [AW-1:0] a;
         reg [IW-1:0] i; reg [TW-1:0] t;
         begin
-            i = a[4+IW-1:4]; t = a[AW-1:4+IW];
+            i = a[4+IW-1:4]; t = a >> (4 + IW);
             if (st[i] == ST_M && tg[i] == t) peek_m = {1'b1, dat[i*4 + a[3:2]]};
             else if ((WBB > 0) && wv && wa == a[AW-1:4]) peek_m = {1'b1, wd[32*a[3:2] +: 32]};   // WBB-02
             else peek_m = 33'd0;

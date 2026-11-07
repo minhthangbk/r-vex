@@ -19,7 +19,11 @@
 //======================================================================
 `timescale 1ns/1ps
 module tb_coherence;
-    localparam AW = 16, L1S = 4, L2S = 8, NW = 64;   // NW words = 16 lines
+    localparam AW = 16;
+    // r18 (geofuzz.py, ppa.md PPA-10): geometry and latencies are parameters; the defaults are the r10..r17 bench
+    parameter L1S = 4, L2S = 8, NW = 64;             // NW words = 16 lines
+    parameter L2LAT = 3, MLAT = 7;
+    localparam L1IW = (L1S > 1) ? $clog2(L1S) : 1;   // r18 Codex R36 F2: the checks index any L1S, not only 4 sets
     parameter DPF = 0, DPF_DEG = 2, DPF_HIST = 4;    // L1D prefetch (r11, prefetch.md DPF-03)
     parameter FAST = 0, FWD = 0, WBB = 0, WBUF = 0;  // r12 bus latency / write buffers (bus.md BUS-02)
     reg clk = 0, reset = 1;
@@ -61,12 +65,13 @@ module tb_coherence;
         .s_valid(s_valid), .s_op(s_op), .s_addr(s_addr), .s_hit_m(s_hit_m), .s_line(s_line),
         .l2_req(l2_req), .l2_we(l2_we), .l2_addr(l2_addr), .l2_wline(l2_wline),
         .l2_done(l2_done), .l2_rline(l2_rline));
-    l2_cache #(.AW(AW), .SETS(L2S), .L2_LAT(3), .MEM_LAT(7), .FAST(FAST), .WBUF(WBUF)) l2 (
+    l2_cache #(.AW(AW), .SETS(L2S), .L2_LAT(L2LAT), .MEM_LAT(MLAT), .FAST(FAST), .WBUF(WBUF)) l2 (
         .clk(clk), .reset(reset), .req(l2_req), .we(l2_we), .addr(l2_addr),
         .wline(l2_wline), .done(l2_done), .rline(l2_rline));
 
     reg [31:0] golden [0:NW-1];
     integer seed, seed0, ncyc, cyc, p, k, w, errors, loads, stores, i;
+    integer ndchk = 0;     // r18 Codex R36 F2: every-cycle data checks that ran (0 = the check was skipped)
     integer wait_cnt [0:1];
     integer lastw [0:1];
     reg sparse;
@@ -92,8 +97,9 @@ module tb_coherence;
                 for (s = 0; s < L1S; s = s + 1)
                     if ((t == 0 ? c[0].l1d.st[s] : c[1].l1d.st[s]) != 0)
                         for (ww = 0; ww < 4; ww = ww + 1) begin
-                            la = {(t == 0 ? c[0].l1d.tg[s] : c[1].l1d.tg[s]), s[1:0], 4'b0} + 4 * ww;
+                            la = ((t == 0 ? c[0].l1d.tg[s] : c[1].l1d.tg[s]) << (4 + L1IW)) + (s << 4) + 4 * ww;   // Codex R36 F2: any L1S
                             a = (la - 16'h1000) >> 2;
+                            if (la >= 16'h1000 && a < NW) ndchk = ndchk + 1;
                             if (la >= 16'h1000 && a < NW &&
                                 (t == 0 ? c[0].l1d.dat[s*4+ww] : c[1].l1d.dat[s*4+ww]) !== golden[a]) begin
                                 $display("DATA VIOLATION cyc=%0d cache=%0d set=%0d word=%0d", cyc, t, s, ww);
@@ -106,13 +112,13 @@ module tb_coherence;
                 for (s = 0; s < DPF; s = s + 1)
                     if (t == 0 ? c[0].l1d.pv[s] : c[1].l1d.pv[s]) begin
                         la = {(t == 0 ? c[0].l1d.pa[s] : c[1].l1d.pa[s]), 4'b0};
-                        if ((t == 0 ? c[0].l1d.st[la[5:4]] : c[1].l1d.st[la[5:4]]) != 0 &&
-                            (t == 0 ? c[0].l1d.tg[la[5:4]] : c[1].l1d.tg[la[5:4]]) == la[15:6]) begin
+                        if ((t == 0 ? c[0].l1d.st[((la >> 4) % L1S)] : c[1].l1d.st[((la >> 4) % L1S)]) != 0 &&
+                            (t == 0 ? c[0].l1d.tg[((la >> 4) % L1S)] : c[1].l1d.tg[((la >> 4) % L1S)]) == (la >> (4 + L1IW))) begin
                             $display("PREFETCH EXCLUSION VIOLATION cyc=%0d cache=%0d entry=%0d", cyc, t, s);
                             errors = errors + 1;
                         end
-                        if ((t == 0 ? c[1].l1d.st[la[5:4]] : c[0].l1d.st[la[5:4]]) == 2 &&
-                            (t == 0 ? c[1].l1d.tg[la[5:4]] : c[0].l1d.tg[la[5:4]]) == la[15:6]) begin
+                        if ((t == 0 ? c[1].l1d.st[((la >> 4) % L1S)] : c[0].l1d.st[((la >> 4) % L1S)]) == 2 &&
+                            (t == 0 ? c[1].l1d.tg[((la >> 4) % L1S)] : c[0].l1d.tg[((la >> 4) % L1S)]) == (la >> (4 + L1IW))) begin
                             $display("PREFETCH SWMR VIOLATION cyc=%0d cache=%0d entry=%0d", cyc, t, s);
                             errors = errors + 1;
                         end
@@ -130,8 +136,8 @@ module tb_coherence;
                             errors = errors + 1;
                         end
                     end
-                    if ((c[0].l1d.st[la[5:4]] != 0 && c[0].l1d.tg[la[5:4]] == la[15:6]) ||
-                        (c[1].l1d.st[la[5:4]] != 0 && c[1].l1d.tg[la[5:4]] == la[15:6])) begin
+                    if ((c[0].l1d.st[((la >> 4) % L1S)] != 0 && c[0].l1d.tg[((la >> 4) % L1S)] == (la >> (4 + L1IW))) ||
+                        (c[1].l1d.st[((la >> 4) % L1S)] != 0 && c[1].l1d.tg[((la >> 4) % L1S)] == (la >> (4 + L1IW)))) begin
                         $display("WBB EXCLUSION VIOLATION cyc=%0d cache=%0d (line in an array)", cyc, t);
                         errors = errors + 1;
                     end
@@ -232,6 +238,8 @@ module tb_coherence;
         $display("BUSR12 fast=%0d fwd=%0d wbb=%0d wbuf=%0d n_busy=%0d n_wait=%0d fwd=%0d/%0d wbb=%0d/%0d wbbsnp=%0d/%0d l2wbuf=%0d mwait=%0d",
                  FAST, FWD, WBB, WBUF, bus.n_busy, bus.n_wait, c[0].l1d.n_fwd, c[1].l1d.n_fwd,
                  c[0].l1d.n_wbb, c[1].l1d.n_wbb, c[0].l1d.n_wbbsnp, c[1].l1d.n_wbbsnp, l2.n_wbuf, l2.n_mwait);
+        $display("DATACHECKS %0d", ndchk);
+        if (ndchk == 0) begin $display("CHECK COVERAGE: no data check ran"); errors = errors + 1; end
         if (errors == 0) $display("RESULT: COHERENCE PASSED");
         else $display("RESULT: COHERENCE FAILED");
         $finish;

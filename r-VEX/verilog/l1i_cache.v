@@ -40,7 +40,11 @@ module l1i_cache #(
     initial if (SETS < 2 || (SETS & (SETS - 1)) != 0) begin
         $display("FATAL %m: SETS=%0d must be a power of two >= 2", SETS); $finish;
     end
-    localparam TW = PC_W - 2 - IW;
+    // BUG-187 (r18): an L1I as large as the program memory (SETS = 2^(PC_W-2)) has no tag bits: TW >= 1, tags by shift
+    localparam TW = (PC_W - 2 - IW > 0) ? PC_W - 2 - IW : 1;
+    initial if (PC_W - 2 - IW < 0) begin
+        $display("FATAL %m: SETS=%0d lines is more than the %0d-packet program memory", SETS, 1 << PC_W); $finish;
+    end
 
     reg [127:0]  rom [0:(1<<PC_W)-1];
     reg          vld [0:SETS-1];
@@ -51,7 +55,7 @@ module l1i_cache #(
     reg [15:0]   cnt;
 
     wire [IW-1:0] idx = i_addr[2+IW-1:2];
-    wire [TW-1:0] tag = i_addr[PC_W-1:2+IW];
+    wire [TW-1:0] tag = i_addr >> (2 + IW);
     wire          hit = vld[idx] && tg[idx] == tag;
 
     // ---- next-line prefetch buffer (IPF) ----
@@ -64,7 +68,7 @@ module l1i_cache #(
     wire [LW-1:0]  ln    = i_addr[PC_W-1:2];
     wire [LW-1:0]  nln   = ln + 1'b1;
     wire [IW-1:0]  nidx  = nln[IW-1:0];
-    wire [TW-1:0]  ntag  = nln[LW-1:IW];
+    wire [TW-1:0]  ntag  = nln >> IW;
     wire           pfhit = (IPF != 0) && !hit && pf_v && pf_ln == ln;
     wire           pf_start = (IPF != 0) && i_req && !filling && !pf_busy && (hit || pfhit) &&
                               !(vld[nidx] && tg[nidx] == ntag) && !(pf_v && pf_ln == nln);
