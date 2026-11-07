@@ -97,8 +97,11 @@ module rvex_core #(
     wire [11:0] off0=syl0[16:5];
 
     // ---- helper: is a compare/logic op that may target BR (CMPEQ..ANDL) ----
+    // CLZ (0x65) and MTB (0x67) sit inside the CMPEQ..ANDL opcode range but are not compares: CLZ writes
+    // only a GR (clz.md), so `clz $r0.0 = x` must write nothing (BUG-181, pfuzz.md PZ-02, found by pfuzz r17:
+    // it wrote BR[syl[4:2]] = clz(x)[0] and counted as a brn writer). MTB keeps its own writeback branch.
     function is_cmp; input [6:0] op; begin
-        is_cmp = (op >= `ALU_CMPEQ) && (op <= `ALU_ANDL); end
+        is_cmp = (op >= `ALU_CMPEQ) && (op <= `ALU_ANDL) && (op != `ALU_CLZ) && (op != `ALU_MTB); end
     endfunction
     function is_mul; input [6:0] op; begin
         is_mul = (op[6:4] == 3'b000) && (op != `OP_NOP); end
