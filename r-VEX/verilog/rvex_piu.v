@@ -12,6 +12,7 @@
 //   0x38 XNOP   0x3C ISTALL  0x40 DSTALL  0x44..0x50 SLOT0..SLOT3
 //   0x54 MULPKT (packets with a multiply)  0x58 SEMSTALL (DSTALL cycles waiting for hw_sem)
 //   0x5C SEMFAIL (committed ldw to hw_sem 0xFFxx that returned 1 = lock taken, 2026-11-04 r10, PIU-18)
+//   0x60 MISALIGN (committed slot-3 accesses not naturally aligned, 2026-11-10 r21, PIU-19, misalign.md MA-03)
 // Events of a cycle are counted with the EN value held during that cycle;
 // a CTRL store takes effect at the end of its cycle, and CLR wins over the
 // increments of that cycle.
@@ -29,6 +30,7 @@ module rvex_piu (
     input  wire        dstall_c,   // held by a D miss / hw_sem wait
     input  wire        semstall_c, // ... of which: waiting for hw_sem (address 0xFFxx)
     input  wire        semfail3,   // slot 3 is an ldw to hw_sem whose answer is 1 (busy); counted on commit
+    input  wire        misal3,     // slot 3 access is not naturally aligned (PIU-19); counted on commit
     // committed packet contents
     input  wire [6:0]  op0, op1, op2, op3,
     input  wire        ctrl0,      // slot 0 holds a control op
@@ -43,7 +45,7 @@ module rvex_piu (
 );
     reg        en;
     reg [63:0] cyc;
-    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail;
+    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign;
     reg [31:0] slot [0:3];
     integer k;
 
@@ -85,6 +87,7 @@ module rvex_piu (
             6'h15: rdata = mulpkt;
             6'h16: rdata = semstall;
             6'h17: rdata = semfail;
+            6'h18: rdata = misalign;
             default: rdata = 32'd0;
         endcase
     end
@@ -93,6 +96,7 @@ module rvex_piu (
         if (reset || (we && addr == 6'h00 && wdata[1])) begin
             cyc <= 64'd0; pkt <= 0; ops <= 0; alu <= 0; mul16 <= 0; mul32 <= 0; ld <= 0; st <= 0;
             ctl <= 0; brt <= 0; noppkt <= 0; xnop <= 0; istall <= 0; dstall <= 0; mulpkt <= 0; semstall <= 0; semfail <= 0;
+            misalign <= 0;
             for (k = 0; k < 4; k = k + 1) slot[k] <= 0;
         end else begin
             if (cnt) cyc <= cyc + 64'd1;
@@ -113,6 +117,7 @@ module rvex_piu (
                 if (nz == 4'd0) noppkt <= noppkt + 1;
                 if (md1 || md2) mulpkt <= mulpkt + 1;
                 if (semfail3) semfail <= semfail + 1;
+                if (misal3) misalign <= misalign + 1;
                 for (k = 0; k < 4; k = k + 1) if (nz[k]) slot[k] <= slot[k] + 1;
             end
         end

@@ -13,6 +13,11 @@
 // pos selects the sub-field inside the 32-bit word, exactly as in the VHDL:
 //   halfword: 00->[31:16] 01->[23:8] 10->[15:0]
 //   byte    : 00->[31:24] 01->[23:16] 10->[15:8] 11->[7:0]
+// Misaligned accesses (reviews/contracts/misalign.md, round 2026-11-10-r21, BUG-182): the core has no trap.
+//   sth at pos 11 would cross into the next word: the word is left unchanged (it was overwritten with all
+//   ones, MA-01); ldh/ldhu at pos 11 return 0 (was 0xFFFF, the VHDL mirror; MA-02); ldw/stw use the word (address bits [1:0]
+//   ignored); sth/ldh at pos 01 use bytes 1..2 (MA-02). `misal` flags an access that is not naturally
+//   aligned (ldw/stw: pos != 0, half: pos[0]); the PIU counts it (MISALIGN, PIU-19, MA-03).
 //======================================================================
 `include "rvex_defs.vh"
 
@@ -25,7 +30,8 @@ module mem_unit (
     output reg  [31:0] store_data, // value to write into data memory (stores)
     output reg         is_load,
     output reg         is_store,
-    output reg         out_valid
+    output reg         out_valid,
+    output reg         misal      // not naturally aligned (MA-03)
 );
     reg [15:0] h;   // extracted halfword
     reg [7:0]  b;   // extracted byte
@@ -36,6 +42,7 @@ module mem_unit (
         is_load    = 1'b0;
         is_store   = 1'b0;
         out_valid  = 1'b1;
+        misal      = 1'b0;
         h = 16'd0;
         b = 8'd0;
 
@@ -44,7 +51,7 @@ module mem_unit (
             2'b00: h = mem_val[31:16];
             2'b01: h = mem_val[23:8];
             2'b10: h = mem_val[15:0];
-            default: h = 16'hFFFF;      // not allowed (mirrors VHDL)
+            default: h = 16'h0000;      // MA-02 (r21): crosses the word; reads 0 (VHDL mirror was 0xFFFF)
         endcase
         // byte field select
         case (pos)
@@ -55,20 +62,21 @@ module mem_unit (
         endcase
 
         case (opcode)
-            `MEM_LDW : begin is_load = 1'b1; load_data = mem_val; end
-            `MEM_LDH : begin is_load = 1'b1; load_data = {{16{h[15]}}, h}; end // FIX: sign-extend
-            `MEM_LDHU: begin is_load = 1'b1; load_data = {16'b0,      h}; end
+            `MEM_LDW : begin is_load = 1'b1; load_data = mem_val; misal = pos != 2'b00; end
+            `MEM_LDH : begin is_load = 1'b1; load_data = {{16{h[15]}}, h}; misal = pos[0]; end // FIX: sign-extend
+            `MEM_LDHU: begin is_load = 1'b1; load_data = {16'b0,      h}; misal = pos[0]; end
             `MEM_LDB : begin is_load = 1'b1; load_data = {{24{b[7]}},  b}; end // FIX: sign-extend
             `MEM_LDBU: begin is_load = 1'b1; load_data = {24'b0,       b}; end
 
-            `MEM_STW : begin is_store = 1'b1; store_data = reg_val; end
+            `MEM_STW : begin is_store = 1'b1; store_data = reg_val; misal = pos != 2'b00; end
             `MEM_STH : begin
                 is_store = 1'b1;
+                misal = pos[0];
                 case (pos)
                     2'b00: store_data = {reg_val[15:0], mem_val[15:0]};
                     2'b01: store_data = {mem_val[31:24], reg_val[15:0], mem_val[7:0]};
                     2'b10: store_data = {mem_val[31:16], reg_val[15:0]};
-                    default: store_data = 32'hFFFF_FFFF;
+                    default: store_data = mem_val;   // MA-01 (BUG-182: was 32'hFFFF_FFFF)
                 endcase
             end
             `MEM_STB : begin

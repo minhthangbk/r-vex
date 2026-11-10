@@ -16,6 +16,7 @@
 #   tb_codex_stall external-port hold contract (I/D miss, XNOP, carry, STOP)
 #   tb_piu        performance indicator unit, bare core (reviews/contracts/piu.md)
 #   tb_piu_sys    PIU in rvex_system: misses, hw_sem, per-core PIUs
+#   tb_misalign   misaligned accesses: mem_unit arms, PIU MISALIGN (reviews/contracts/misalign.md, r21 BUG-182)
 #   tb_cmpbr      compare to BR with an immediate (reviews/contracts/cmpbr.md)
 #   tb_brnew      brn/brfn: branch on the BR written in its own packet (reviews/contracts/brnew.md)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds; + 6 seeds with DPF = 4)
@@ -51,11 +52,13 @@ run tb_core_prog  "$CORE"                                     tb_core_prog.v
 run tb_core_carry "$CORE"                                     tb_core_carry.v
 run tb_codex_stall "$CORE"                                     tb_codex_stall.v
 run tb_piu        "$CORE"                                     tb_piu.v
+run tb_misalign   "$CORE"                                     tb_misalign.v
 run tb_piu_sys    "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_piu_sys.v
 run tb_codex_piu_edges   "rvex_piu.v"                          tb_codex_piu_edges.v
 run tb_codex_piu_core    "$CORE"                               tb_codex_piu_core.v
 run tb_codex_r21_piuaw  "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_r21_piuaw.v
 run tb_codex_semfail     "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_semfail.v
+run tb_codex_r42_misal_sys "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_r42_misal_sys.v
 run tb_codex_piu_dualctrl "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_codex_piu_dualctrl.v
 run tb_codex_piu_r11     "$CORE"                               tb_codex_piu_r11.v
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v

@@ -168,10 +168,10 @@ module rvex_core #(
     wire        piu_hit       = PIU && (op3[6:4] == 3'b001) && mem_ea[DMEM_AW-1:8] == 8'hFE;
     wire [31:0] piu_rdata;
     wire [31:0] dmem_word     = piu_hit ? piu_rdata : EXT_DMEM ? d_rdata : dmem[dmem_word_addr];
-    wire [31:0] mem_load, mem_store; wire mem_is_load, mem_is_store, mem_v;
+    wire [31:0] mem_load, mem_store; wire mem_is_load, mem_is_store, mem_v, mem_misal;
     mem_unit u_mem(.opcode(op3),.mem_val(dmem_word),.reg_val(gr_r2_3),.pos(dmem_pos),
                    .load_data(mem_load),.store_data(mem_store),
-                   .is_load(mem_is_load),.is_store(mem_is_store),.out_valid(mem_v));
+                   .is_load(mem_is_load),.is_store(mem_is_store),.out_valid(mem_v),.misal(mem_misal));
 
     // ---- control unit (slot 0) ----
     wire [PC_W-1:0] c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
@@ -233,6 +233,8 @@ module rvex_core #(
         // PIU-18: a test-and-set ldw on hw_sem (system only: EXT_DMEM) that found the lock taken
         // window decoded like rvex_system (d_addr[AW-1:8] all ones; Codex R20 C-1: [15:8] was wrong for AW != 16)
         .semfail3(EXT_DMEM && op3 == `MEM_LDW && &mem_ea[DMEM_AW-1:8] && d_rdata[0]),
+        // PIU-19 (misalign.md MA-03, r21 BUG-182): a committed slot-3 access that is not naturally aligned
+        .misal3(mem_acc && mem_misal),
         .addr(mem_ea[7:2]), .rdata(piu_rdata),
         .we(commit && piu_hit && mem_is_store), .wdata(mem_store));
 
