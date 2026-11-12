@@ -69,6 +69,14 @@ run tb_codex_brnew_edges "$CORE"                           tb_codex_brnew_edges.
 # cache prefetch (reviews/contracts/prefetch.md, r11)
 run tb_l1i_pf          "l1i_cache.v"                       tb_l1i_pf.v
 run tb_l1d_pf          "l1d_cache.v coh_bus.v l2_cache.v"  tb_l1d_pf.v
+run tb_sblock          "l1d_cache.v coh_bus.v l2_cache.v"  tb_sblock.v      # r23 bus.md BUS-08 (BUG-044; RDX, RD, UPGR: Codex R46 F4)
+run tb_codex_r46_age_wrap "l1d_cache.v coh_bus.v l2_cache.v" tb_codex_r46_age_wrap.v   # r23 DPF-14 age matrix (Codex R46 F2)
+run tb_codex_r47_age_paths "l1d_cache.v coh_bus.v l2_cache.v" tb_codex_r47_age_paths.v # r23 DPF-14 every marking path (Codex R47 b)
+for d in 1 2 3 4; do   # r23 DPF-11..13 stride corners (Codex R46 d): 16/255 accepted, 15/256 rejected, store-only, kills
+    iverilog -g2012 -I . -Ptb_codex_r46_stride_edges.DEG=$d -o tb_codex_r46_stride_edges.vvp l1d_cache.v coh_bus.v l2_cache.v tb_codex_r46_stride_edges.v
+    echo "### Running  tb_codex_r46_stride_edges DEG=$d ###" | tee -a "$LOG"
+    vvp tb_codex_r46_stride_edges.vvp | tee -a "$LOG"
+done
 # final verify r11: prefetch corners inside MSI, 2 seeds x 2 shapes
 iverilog -g2012 -I . -o tb_verify_r11_dpf.vvp l1d_cache.v coh_bus.v l2_cache.v tb_verify_r11_dpf.v
 iverilog -g2012 -I . -Ptb_verify_r11_dpf.L1S=4 -Ptb_verify_r11_dpf.DEG=2 -o tb_verify_r11_dpf4.vvp l1d_cache.v coh_bus.v l2_cache.v tb_verify_r11_dpf.v
@@ -82,6 +90,12 @@ run tb_codex_r22_dpf_edges "l1d_cache.v coh_bus.v l2_cache.v" tb_codex_r22_dpf_e
 iverilog -g2012 -I . -Ptb_l1d_pf.DEG=1 -o tb_l1d_pf1.vvp l1d_cache.v coh_bus.v l2_cache.v tb_l1d_pf.v
 echo "### Running  tb_l1d_pf DEG=1 ###" | tee -a "$LOG"
 vvp tb_l1d_pf1.vvp | tee -a "$LOG"
+# r23 (prefetch.md DPF-11..14): stride targets and oldest-first order, degree 2 and 1 (DEG 1 STR 1 AGE 1 = system)
+for d in 2 1; do
+    iverilog -g2012 -I . -Ptb_l1d_pf.DEG=$d -Ptb_l1d_pf.STR=1 -Ptb_l1d_pf.AGE=1 -o tb_l1d_pfs$d.vvp l1d_cache.v coh_bus.v l2_cache.v tb_l1d_pf.v
+    echo "### Running  tb_l1d_pf DEG=$d STR=1 AGE=1 ###" | tee -a "$LOG"
+    vvp tb_l1d_pfs$d.vvp | tee -a "$LOG"
+done
 # compare to BR with an immediate (reviews/contracts/cmpbr.md), 3 seeds
 iverilog -g2012 -I . -o tb_cmpbr.vvp $CORE tb_cmpbr.v
 for seed in 1 2 3; do
@@ -119,10 +133,10 @@ for c in "0 0 0 0 0" "1 0 0 0 0" "1 1 0 0 0" "0 0 1 0 0" "0 0 0 1 0" "1 1 1 0 0"
     echo "### Running  tb_bus_lat FAST=$1 FWD=$2 WBB=$3 WBUF=$4 DPF=$5 ###" | tee -a "$LOG"
     vvp tb_bus_lat.vvp | tee -a "$LOG"
 done
-# random MSI with every r12 feature (+ DPF = 4, DEG 1 = the rvex_system defaults), dense and sparse,
+# random MSI with every r12 feature (+ DPF = 4, DEG 1, r23 STR 1 AGE 1 = the rvex_system defaults), dense and sparse,
 # and the write-back buffer alone
 iverilog -g2012 -I . -Ptb_coherence.FAST=1 -Ptb_coherence.FWD=1 -Ptb_coherence.WBB=1 -Ptb_coherence.WBUF=1 \
-    -Ptb_coherence.DPF=4 -Ptb_coherence.DPF_DEG=1 -o tb_coherence_bus.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
+    -Ptb_coherence.DPF=4 -Ptb_coherence.DPF_DEG=1 -Ptb_coherence.DPF_STR=1 -Ptb_coherence.DPF_AGE=1 -o tb_coherence_bus.vvp l1d_cache.v coh_bus.v l2_cache.v tb_coherence.v
 for seed in 1 2 3 4; do
     echo "### Running  tb_coherence_bus seed $seed ###" | tee -a "$LOG"
     vvp tb_coherence_bus.vvp +SEED=$seed +CYCLES=50000 | tee -a "$LOG"

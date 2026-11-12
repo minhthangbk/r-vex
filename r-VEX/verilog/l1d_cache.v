@@ -35,6 +35,24 @@
 // (no snoop can arrive then and the fill writes only the buffer).
 // DPF = 0 is the r10 cache, cycle for cycle.
 //
+// DPF_STR = 1 (2026-11-11 r23, prefetch.md DPF-11..13, BUG-134): a stride
+// detector without a PC watches the addresses of the completed core
+// accesses (a repeated address, e.g. the store of a read-modify-write, is
+// skipped). Two equal deltas S in 16..255 bytes (at least one line) make it
+// confident; an access at last + S then re-arms its buffer entry with the
+// line of addr + DPF_DEG*S (the line the stream touches DPF_DEG accesses
+// ahead, never a line the stride skips) instead of line + DPF_DEG, and a
+// demand miss at last + S allocates the lines of addr + j*S (j = 1..DEG)
+// even without L-1 in the miss history. Otherwise the DPF rules above hold.
+// DPF_STR = 0 is the r22 cache, cycle for cycle.
+//
+// DPF_AGE = 1 (r23, prefetch.md DPF-14, BUG-240): pending entries are
+// fetched oldest first (an NP x NP age matrix: an entry that becomes pending
+// is younger than every other entry; Codex R46 F2 replaced 8-bit stamps that
+// lost the order after 256 allocations), so an entry re-armed at a hit never
+// overtakes an older pending line the stream needs first. DPF_AGE = 0: lowest
+// index first (r22).
+//
 // FWD = 1 (2026-11-04 r12, reviews/contracts/bus.md FWD-01/02): a demand
 // RD/RDX/UPGR completes the core access in its completion cycle (the load
 // reads the arriving line, a store is merged into it), one cycle earlier.
@@ -53,6 +71,8 @@ module l1d_cache #(
     parameter DPF      = 0,       // prefetch buffer lines (0 = no prefetch)
     parameter DPF_DEG  = 2,       // lines prefetched ahead of a stream
     parameter DPF_HIST = 4,       // demand-miss history entries (allocation filter)
+    parameter DPF_STR  = 0,       // r23: stride detector for the prefetch targets (0 = next-line only)
+    parameter DPF_AGE  = 0,       // r23 (BUG-240): fetch the oldest pending entry first (0 = lowest index)
     parameter FWD      = 0,       // r12: forward the fill to the core in the completion cycle
     parameter WBB      = 0        // r12: one-line write-back (victim) buffer
 ) (
@@ -128,6 +148,7 @@ module l1d_cache #(
     reg [$clog2(NP > 1 ? NP : 2)-1:0] rp;          // FIFO allocation pointer
     reg          cur_pf;                           // the granted transaction is a prefetch
     reg [$clog2(NP > 1 ? NP : 2)-1:0] cur_pb;
+    reg [NP-1:0] ob  [0:NP-1];                     // DPF-14: ob[i][j] = entry i became pending before entry j
 
     // ---- core lookup ----
     wire [IW-1:0] c_idx = c_addr[4+IW-1:4];
@@ -174,13 +195,17 @@ module l1d_cache #(
     reg          bh, pq;
     reg [$clog2(NP > 1 ? NP : 2)-1:0] bhi, pqi;
     // per-entry wires (constant indexes, so the always @(*) below sees them)
-    wire [NP-1:0] e_hit, e_pend;
+    wire [NP-1:0] e_hit, e_pend, e_old;
     wire [NH-1:0] e_seq;
     genvar gb;
     generate
         for (gb = 0; gb < NP; gb = gb + 1) begin : pe
             assign e_hit[gb]  = (DPF > 0) && pv[gb] && pa[gb] == c_line;
             assign e_pend[gb] = (DPF > 0) && pp[gb];
+            // DPF-14: pending and older than every other pending entry (a continuous assign per entry, so the
+            // selection follows every change of the age matrix; NP-bit operands)
+            localparam [NP-1:0] OH = {{(NP > 1 ? NP - 1 : 1){1'b0}}, 1'b1} << gb;
+            assign e_old[gb]  = e_pend[gb] && &(ob[gb] | ~e_pend | OH);
         end
         for (gb = 0; gb < NH; gb = gb + 1) begin : he
             assign e_seq[gb] = (DPF > 0) && hv[gb] && hist[gb] == c_line - 1'b1;
@@ -191,7 +216,8 @@ module l1d_cache #(
         bh = 1'b0; bhi = 0; pq = 1'b0; pqi = 0;
         for (b = NP - 1; b >= 0; b = b - 1) begin
             if (e_hit[b])  begin bh = 1'b1; bhi = b; end
-            if (e_pend[b]) begin pq = 1'b1; pqi = b; end
+            // DPF-14: the oldest pending entry (older than every other pending one); DPF_AGE = 0: the lowest index
+            if (e_pend[b] && (DPF_AGE == 0 || e_old[b])) begin pq = 1'b1; pqi = b; end
         end
     end
     wire [LA-1:0] p_line = pa[pqi];
@@ -227,6 +253,25 @@ module l1d_cache #(
 
     // DPF-06: allocation filter (line L-1 among the last DPF_HIST demand misses)
     wire seq = |e_seq;
+    // DPF-11..13 (r23): stride detector over the completed core accesses
+    reg  [AW-1:0] sd_a, sd_s;                      // last address, last delta
+    reg           sd_c;                            // the last two deltas were equal
+    wire [AW-1:0] c_aw = c_addr[AW-1:0];
+    wire          sh   = (DPF > 0) && (DPF_STR > 0) && sd_c && sd_s >= 16 && sd_s <= 255 && c_aw == sd_a + sd_s;
+    function [LA-1:0] tgt;                          // prefetch target j accesses / lines ahead
+        input integer j;
+        reg [AW-1:0] t;
+        begin
+            t = c_aw + j * sd_s;
+            tgt = sh ? t[AW-1:4] : c_line + j;
+        end
+    endfunction
+    always @(posedge clk)
+        if (reset) begin sd_a <= {AW{1'b0}}; sd_s <= {AW{1'b0}}; sd_c <= 1'b0; end
+        else if ((DPF_STR > 0) && c_req && c_ready && c_aw != sd_a) begin
+            sd_c <= (c_aw - sd_a) == sd_s;
+            sd_s <= c_aw - sd_a; sd_a <= c_aw;
+        end
     // is line x already cached or buffered (valid or pending)?
     function have;
         input [LA-1:0] x;
@@ -242,7 +287,7 @@ module l1d_cache #(
     wire [IW-1:0] cur_idx = cur_addr[4+IW-1:4];
     wire [TW-1:0] cur_tag = cur_addr >> (4 + IW);
 
-    integer k;
+    integer k, q2;
     always @(posedge clk) begin
         if (reset) begin
             for (k = 0; k < SETS; k = k + 1) begin st[k] <= ST_I; tg[k] <= {TW{1'b0}}; end
@@ -250,7 +295,7 @@ module l1d_cache #(
             n_hit <= 0; n_miss <= 0; n_wb <= 0; n_upgr <= 0; n_inval <= 0; n_flush <= 0;
             n_pf <= 0; n_pfhit <= 0; n_pfkill <= 0; n_pfuseless <= 0; n_pflate <= 0; rp <= 0; cur_pf <= 1'b0; cur_pb <= 0;
             n_wbb <= 0; n_wbbsnp <= 0; n_fwd <= 0; wv <= 1'b0; wa <= {(AW-4){1'b0}}; cur_wbb <= 1'b0;
-            for (k = 0; k < NP; k = k + 1) begin pv[k] <= 1'b0; pp[k] <= 1'b0; pa[k] <= {LA{1'b0}}; end
+            for (k = 0; k < NP; k = k + 1) begin pv[k] <= 1'b0; pp[k] <= 1'b0; pa[k] <= {LA{1'b0}}; ob[k] <= {NP{1'b0}}; end
             for (k = 0; k < NH; k = k + 1) begin hv[k] <= 1'b0; hist[k] <= {LA{1'b0}}; end
         end else begin
             // core hit: store data / count
@@ -284,8 +329,9 @@ module l1d_cache #(
                 dat[c_idx*4+0] <= pd[bhi][31:0];  dat[c_idx*4+1] <= pd[bhi][63:32];
                 dat[c_idx*4+2] <= pd[bhi][95:64]; dat[c_idx*4+3] <= pd[bhi][127:96];
                 n_pfhit <= n_pfhit + 1;
-                pv[bhi] <= 1'b0; pa[bhi] <= c_line + DPF_DEG;
-                pp[bhi] <= !have(c_line + DPF_DEG);
+                pv[bhi] <= 1'b0; pa[bhi] <= tgt(DPF_DEG);
+                pp[bhi] <= !have(tgt(DPF_DEG));
+                for (q2 = 0; q2 < NP; q2 = q2 + 1) begin ob[bhi][q2] <= 1'b0; ob[q2][bhi] <= 1'b1; end   // DPF-14: youngest
             end
             // a pending entry whose line got cached is dropped
             if (DPF > 0 && !busy && !need && pq && p_cached) pp[pqi] <= 1'b0;
@@ -304,12 +350,15 @@ module l1d_cache #(
                         integer j, n;
                         // a pending entry for this line is no longer needed
                         for (k = 0; k < NP; k = k + 1) if (pp[k] && pa[k] == c_line) pp[k] <= 1'b0;
-                        // DPF-06: sequential miss -> prefetch L+1..L+DEG
+                        // DPF-06: sequential miss -> prefetch L+1..L+DEG; DPF-12: a miss on the stride -> its lines
                         n = 0;
-                        if (seq) for (j = 1; j <= DPF_DEG; j = j + 1)
-                            if (!have(c_line + j)) begin
+                        if (seq || sh) for (j = 1; j <= DPF_DEG; j = j + 1)
+                            if (!have(tgt(j))) begin
                                 if (pv[(rp + n) % NP]) n_pfuseless <= n_pfuseless + 1;
-                                pa[(rp + n) % NP] <= c_line + j; pp[(rp + n) % NP] <= 1'b1;
+                                pa[(rp + n) % NP] <= tgt(j); pp[(rp + n) % NP] <= 1'b1;
+                                for (q2 = 0; q2 < NP; q2 = q2 + 1) begin   // DPF-14: youngest (later n: younger)
+                                    ob[(rp + n) % NP][q2] <= 1'b0; ob[q2][(rp + n) % NP] <= 1'b1;
+                                end
                                 pv[(rp + n) % NP] <= 1'b0; n = n + 1;
                             end
                         rp <= (rp + n) % NP;

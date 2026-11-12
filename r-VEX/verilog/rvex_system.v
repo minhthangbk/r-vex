@@ -32,6 +32,8 @@ module rvex_system #(
     // cached-small -6.1 % of all suite cycles; L1I_IPF = 0 and L1D_DPF = 0 give the r10 system)
     parameter L1I_IPF  = 1,        // 1: L1I next-line prefetch buffer (VLIW fetch stream)
     parameter L1D_DPF  = 4,        // L1D stream prefetch buffer lines (0 = off)
+    parameter L1D_STR  = 1,        // r23 (prefetch.md DPF-11..13, BUG-134): stride targets for the L1D prefetch (0 = r22)
+    parameter L1D_AGE  = 1,        // r23 (prefetch.md DPF-14, BUG-240): oldest pending prefetch first (0 = r22)
     parameter L1D_DEG  = 1,        // L1D prefetch degree (lines ahead; 2 was slower: bus bandwidth)
     parameter L1D_HIST = 4,        // L1D demand-miss history (allocation filter)
     // bus latency and write buffers (2026-11-04 r12, reviews/contracts/bus.md; all 0 = the r11 system).
@@ -102,7 +104,7 @@ module rvex_system #(
             .clk(clk), .reset(reset), .i_req(i_req), .i_addr(i_addr),
             .i_rdata(i_rdata), .i_ready(i_ready));
         l1d_cache #(.AW(AW), .SETS(L1D_SETS), .DPF(L1D_DPF), .DPF_DEG(L1D_DEG),
-                    .DPF_HIST(L1D_HIST), .FWD(L1D_FWD), .WBB(L1D_WBB)) l1d (
+                    .DPF_HIST(L1D_HIST), .DPF_STR(L1D_STR), .DPF_AGE(L1D_AGE), .FWD(L1D_FWD), .WBB(L1D_WBB)) l1d (
             .clk(clk), .reset(reset),
             .c_req(d_req && !mmio), .c_we(d_we), .c_addr(d_addr), .c_wdata(d_wdata),
             .c_rdata(c_rdata), .c_ready(c_ready),

@@ -20,6 +20,8 @@
 module tb_l1d_pf;
     localparam AW = 16, L1S = 16, NW = 1024;
     parameter DEG = 2;                     // -Ptb_l1d_pf.DEG=1 runs the same cases with degree 1
+    parameter STR = 0;                     // r23: -Ptb_l1d_pf.STR=1 = stride targets (prefetch.md DPF-11..13)
+    parameter AGE = 0;                     // r23: -Ptb_l1d_pf.AGE=1 = oldest pending first (DPF-14, BUG-240)
     reg clk = 0, reset = 1;
     always #5 clk = ~clk;
 
@@ -41,7 +43,7 @@ module tb_l1d_pf;
 
     genvar g;
     generate for (g = 0; g < 2; g = g + 1) begin : c
-        l1d_cache #(.AW(AW), .SETS(L1S), .DPF(4), .DPF_DEG(DEG), .DPF_HIST(4)) l1d (
+        l1d_cache #(.AW(AW), .SETS(L1S), .DPF(4), .DPF_DEG(DEG), .DPF_HIST(4), .DPF_STR(STR), .DPF_AGE(AGE)) l1d (
             .clk(clk), .reset(reset),
             .c_req(c_req[g]), .c_we(c_we[g]), .c_addr(c_addr[g]), .c_wdata(c_wdata[g]),
             .c_rdata(c_rdata[g]), .c_ready(c_ready[g]),
@@ -101,7 +103,27 @@ module tb_l1d_pf;
             if (errors > 20) begin $display("RESULT: L1D PREFETCH FAILED (too many)"); $finish; end
         end
 
-    integer pf0, hit0, miss0, kill1, hit1, wb0, up0, i;
+    // r23 DPF-14 invariant (Codex R46 F2): with AGE = 1 the entry chosen for the next prefetch became pending no
+    // later than any other pending entry (32-bit cycle stamps kept by the testbench: no wrap); every cycle, both cores
+    integer cyc_n = 0, ps0 [0:3], ps1 [0:3], m;
+    reg [3:0] opp0 = 0, opp1 = 0;
+    reg [AW-5:0] opa0 [0:3], opa1 [0:3];
+    always @(negedge clk) if (!reset) begin
+        cyc_n = cyc_n + 1;
+        for (m = 0; m < 4; m = m + 1) begin   // stamps first (values after this cycle's update), then the check
+            if (c[0].l1d.pp[m] && (!opp0[m] || c[0].l1d.pa[m] != opa0[m])) ps0[m] = cyc_n;
+            if (c[1].l1d.pp[m] && (!opp1[m] || c[1].l1d.pa[m] != opa1[m])) ps1[m] = cyc_n;
+            opp0[m] = c[0].l1d.pp[m]; opa0[m] = c[0].l1d.pa[m]; opp1[m] = c[1].l1d.pp[m]; opa1[m] = c[1].l1d.pa[m];
+        end
+        if (AGE) for (m = 0; m < 4; m = m + 1) begin
+            if (c[0].l1d.pq && c[0].l1d.pp[m] && ps0[m] < ps0[c[0].l1d.pqi]) begin
+                $display("FAIL DPF-14 core 0: entry %0d (pending since %0d) is older than the chosen %0d (since %0d)",
+                         m, ps0[m], c[0].l1d.pqi, ps0[c[0].l1d.pqi]); errors = errors + 1; end
+            if (c[1].l1d.pq && c[1].l1d.pp[m] && ps1[m] < ps1[c[1].l1d.pqi]) begin
+                $display("FAIL DPF-14 core 1: entry %0d older than the chosen %0d", m, c[1].l1d.pqi); errors = errors + 1; end
+        end
+    end
+    integer pf0, hit0, miss0, kill1, hit1, wb0, up0, i, useless;
     initial begin
         errors = 0; c_req = 0; c_we = 0;
         for (k = 0; k < (1 << (AW - 2)); k = k + 1) l2.mem[k] = 32'd0;
@@ -181,6 +203,46 @@ module tb_l1d_pf;
         hit0 = c[0].l1d.n_pfhit;
         acc(0, 0, 202, 0, 0); acc(0, 0, 232, 0, 0);
         expect_eq("two streams buffer hits", c[0].l1d.n_pfhit - hit0, 2);
+
+        // ---- r23 (DPF-11..13, BUG-134): read-modify-write stream with a stride of 5 words (20 B: the stream
+        //      skips one line in five). Stride targets: every prefetched line is used except the last DEG ones
+        //      (beyond the end) and the r22 allocation at the start; next-line targets fetch the skipped lines ----
+        idle(40);
+        pf0 = c[0].l1d.n_pf; hit0 = c[0].l1d.n_pfhit; miss0 = c[0].l1d.n_miss;
+        for (i = 0; i < 32; i = i + 1) begin
+            acc(0, 0, 130 + (5 * i) / 4, (5 * i) % 4, 0);
+            acc(0, 1, 130 + (5 * i) / 4, (5 * i) % 4, 32'h5000_0000 + i);
+            idle(12);
+        end
+        idle(40);
+        useless = (c[0].l1d.n_pf - pf0) - (c[0].l1d.n_pfhit - hit0);
+        $display("     stride5: prefetches %0d, buffer hits %0d, demand misses %0d, useless %0d",
+                 c[0].l1d.n_pf - pf0, c[0].l1d.n_pfhit - hit0, c[0].l1d.n_miss - miss0, useless);
+        if (STR) begin
+            expect_eq("stride5 useless <= DEG+1 (DPF-11)", useless <= DEG + 1, 1);
+            expect_eq("stride5 demand misses <= 3 (DPF-12)", c[0].l1d.n_miss - miss0 <= 3, 1);
+        end else
+            expect_eq("stride5 next-line fetches skipped lines (r22)", useless >= 4, 1);
+        // ---- r23 (DPF-13): alternating deltas (two fields of a 20-byte struct, +0 and +4): no confident stride,
+        //      so the next-line rule holds: every line after the first two comes from the buffer ----
+        idle(40);
+        hit0 = c[0].l1d.n_pfhit; miss0 = c[0].l1d.n_miss;
+        for (i = 0; i < 24; i = i + 1) begin
+            acc(0, 0, 180 + (5 * i) / 4, (5 * i) % 4, 0);
+            acc(0, 0, 180 + (5 * i + 1) / 4, (5 * i + 1) % 4, 0);
+            idle(12);
+        end
+        $display("     struct20: buffer hits %0d, demand misses %0d", c[0].l1d.n_pfhit - hit0, c[0].l1d.n_miss - miss0);
+        // DPF-14 (BUG-240): with DEG = 2 and lowest-index order the re-armed entry overtakes the older pending line
+        if (AGE || DEG == 1) expect_eq("struct20 demand misses (DPF-13 next-line, DPF-14 order)", c[0].l1d.n_miss - miss0, 2);
+        else expect_eq("struct20 lowest-index order misses lines (r22, BUG-240)", c[0].l1d.n_miss - miss0 > 2, 1);
+        // ---- r23 (DPF-13): unit-stride word walk (delta 4 B < one line): no stride target, the next-line rule holds
+        //      (DPF-M21: a 4-byte stride would re-arm the line in use and stop the stream) ----
+        idle(40);
+        hit0 = c[0].l1d.n_pfhit; miss0 = c[0].l1d.n_miss;
+        for (i = 0; i < 64; i = i + 1) begin acc(0, 0, 212 + i / 4, i % 4, 0); idle(4); end
+        $display("     words: buffer hits %0d, demand misses %0d", c[0].l1d.n_pfhit - hit0, c[0].l1d.n_miss - miss0);
+        if (AGE || DEG == 1) expect_eq("word walk demand misses (DPF-13 next-line)", c[0].l1d.n_miss - miss0, 2);
         if (errors == 0) $display("RESULT: L1D PREFETCH PASSED");
         else $display("RESULT: L1D PREFETCH FAILED (%0d)", errors);
         $finish;

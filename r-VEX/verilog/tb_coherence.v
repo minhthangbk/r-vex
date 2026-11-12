@@ -25,6 +25,7 @@ module tb_coherence;
     parameter L2LAT = 3, MLAT = 7;
     localparam L1IW = (L1S > 1) ? $clog2(L1S) : 1;   // r18 Codex R36 F2: the checks index any L1S, not only 4 sets
     parameter DPF = 0, DPF_DEG = 2, DPF_HIST = 4;    // L1D prefetch (r11, prefetch.md DPF-03)
+    parameter DPF_STR = 0, DPF_AGE = 0;              // r23: stride targets, oldest-first order (DPF-11..14)
     parameter FAST = 0, FWD = 0, WBB = 0, WBUF = 0;  // r12 bus latency / write buffers (bus.md BUS-02)
     reg clk = 0, reset = 1;
     always #5 clk = ~clk;
@@ -49,7 +50,7 @@ module tb_coherence;
     genvar g;
     generate for (g = 0; g < 2; g = g + 1) begin : c
         l1d_cache #(.AW(AW), .SETS(L1S), .DPF(DPF), .DPF_DEG(DPF_DEG), .DPF_HIST(DPF_HIST),
-                    .FWD(FWD), .WBB(WBB)) l1d (
+                    .DPF_STR(DPF_STR), .DPF_AGE(DPF_AGE), .FWD(FWD), .WBB(WBB)) l1d (
             .clk(clk), .reset(reset),
             .c_req(c_req[g]), .c_we(c_we[g]), .c_addr(c_addr[g]), .c_wdata(c_wdata[g]),
             .c_rdata(c_rdata[g]), .c_ready(c_ready[g]),
