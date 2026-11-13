@@ -35,6 +35,8 @@ module rvex_piu (
     input  wire [6:0]  op0, op1, op2, op3,
     input  wire        ctrl0,      // slot 0 holds a control op
     input  wire        taken0,     // ... and it changes the PC
+    input  wire        ctrl1,      // slot 1 holds a control op (mwbr.md MW-05, r24)
+    input  wire        taken1,     // ... a slot-1 branch changed the PC (slot 0 did not)
     input  wire        mul1, mul2, // slot 1/2 op is a multiply
     input  wire        ld3, st3,   // slot 3 op is a load / a store
     // register port (slot 3)
@@ -57,7 +59,7 @@ module rvex_piu (
     wire [2:0] n_ops = nz[0] + nz[1] + nz[2] + nz[3];
     wire [1:0] n_m16 = m16_1 + m16_2;
     wire [1:0] n_m32 = (md1 && !m16_1) + (md2 && !m16_2);
-    wire [2:0] n_alu = n_ops - (md1 + md2) - ld3 - st3 - ctrl0;
+    wire [2:0] n_alu = n_ops - (md1 + md2) - ld3 - st3 - ctrl0 - ctrl1;
     wire       cnt = active && en;
     wire       cpk = cnt && commit;
 
@@ -112,8 +114,8 @@ module rvex_piu (
                 mul32 <= mul32 + n_m32;
                 ld    <= ld + ld3;
                 st    <= st + st3;
-                ctl   <= ctl + ctrl0;
-                brt   <= brt + taken0;
+                ctl   <= ctl + ctrl0 + ctrl1;
+                brt   <= brt + (taken0 | taken1);
                 if (nz == 4'd0) noppkt <= noppkt + 1;
                 if (md1 || md2) mulpkt <= mulpkt + 1;
                 if (semfail3) semfail <= semfail + 1;

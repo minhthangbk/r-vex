@@ -15,7 +15,7 @@ module tb_codex_piu_edges;
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
         .xnop_c(xnop_c), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3), .ctrl0(ctrl0),
-        .taken0(taken0), .mul1(mul1), .mul2(mul2), .ld3(ld3), .st3(st3),
+        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .ld3(ld3), .st3(st3),
         .addr(addr), .rdata(rdata), .we(we), .wdata(wdata));
 
     always #5 clk = ~clk;

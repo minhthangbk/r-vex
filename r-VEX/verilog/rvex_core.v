@@ -203,6 +203,25 @@ module rvex_core #(
     wire slot0_is_ctrl = (op0[6:4] == 3'b010);
     wire slot0_is_stop = (op0 == `OP_STOP);
 
+    // ---- second branch unit (slot 1), reviews/contracts/mwbr.md MW-01..04 (round r24, BUG-103) ----
+    // Only br/brf/brn/brfn/goto act in slot 1; the slot-1 branch counts only when slot 0 does not change the PC
+    // (taken branch, goto, call, return, rfi) and is no xnop (MW-02, program order). brn/brfn in slot 1 take the BR
+    // that slot 0, 2 or 3 of this packet writes (slot 3 last, MW-03). A control op in slot 1 writes nothing (MW-04).
+    wire slot1_is_ctrl = (op1[6:4] == 3'b010);
+    wire slot1_is_br   = (op1 == `CTRL_BR || op1 == `CTRL_BRF || op1 == `CTRL_GOTO);
+    // MW-01/04: STOP (0x1f, not class 010) in slot 1 is inert too (Codex R48 F1, BUG-257)
+    wire slot1_inert   = slot1_is_ctrl || (op1 == `OP_STOP);
+    wire [2:0] c1_bi   = syl1[4:2];
+    wire c1_new = syl1[17] && (op1 == `CTRL_BR || op1 == `CTRL_BRF);
+    wire c1_br_in = !c1_new ? br[c1_bi] :
+                    brw_hit(op3, imt3, syl3, c1_bi) && op3[6:4] != 3'b001 ? brw_val(op3, alu3_r, alu3_c) :
+                    brw_hit(op2, imt2, syl2, c1_bi) ? brw_val(op2, alu2_r, alu2_c) :
+                    brw_hit(op0, imt0, syl0, c1_bi) && !slot0_is_ctrl ? brw_val(op0, alu0_r, alu0_c) : br[c1_bi];
+    wire c1_cond  = (op1 == `CTRL_GOTO) ? 1'b1 : (op1 == `CTRL_BR) ? c1_br_in : ~c1_br_in;
+    wire slot0_redirect = slot0_is_ctrl && (c_taken || c_xnop);
+    wire c1_taken = slot1_is_br && c1_cond && !slot0_redirect;
+    wire [PC_W-1:0] c1_target = syl1[5+PC_W-1:5];
+
     // ---- per-slot GR result select (ALU vs MUL) ----
     wire [31:0] res1 = is_mul(op1) ? mul1_r : alu1_r;
     wire [31:0] res2 = is_mul(op2) ? mul2_r : alu2_r;
@@ -228,6 +247,7 @@ module rvex_core #(
         .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall), .semstall_c(&mem_ea[DMEM_AW-1:8]),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3),
         .ctrl0(slot0_is_ctrl), .taken0(slot0_is_ctrl && c_taken && !c_xnop),
+        .ctrl1(slot1_is_ctrl), .taken1(c1_taken),   // mwbr.md MW-05
         .mul1(is_mul(op1)), .mul2(is_mul(op2)),
         .ld3(mem_acc && mem_is_load), .st3(mem_acc && mem_is_store),
         // PIU-18: a test-and-set ldw on hw_sem (system only: EXT_DMEM) that found the lock taken
@@ -274,7 +294,8 @@ module rvex_core #(
                     end
 
                     //--------------- writeback slot 1 ---------------
-                    if (op1 == `ALU_MTB) br[dbr1] <= alu1_c;
+                    if (slot1_inert) begin end              // MW-04: a slot-1 control op or STOP writes no GR / BR
+                    else if (op1 == `ALU_MTB) br[dbr1] <= alu1_c;
                     else if (bi1) br[syl1[19:17]] <= alu1_r[0];
                     else if (is_addcg_divs(op1)) begin
                         if (dst1 != 6'd0) gr[dst1] <= alu1_r; br[dbr1] <= alu1_c;
@@ -307,6 +328,8 @@ module rvex_core #(
                         pc <= pc + 1'b1;
                     end else if (slot0_is_ctrl && c_taken) begin
                         pc <= c_pc_goto;                    // branch / call / return
+                    end else if (c1_taken) begin
+                        pc <= c1_target;                    // MW-02: slot-1 branch (slot 0 did not redirect)
                     end else begin
                         pc <= pc + 1'b1;
                     end

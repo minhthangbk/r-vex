@@ -19,6 +19,7 @@
 #   tb_misalign   misaligned accesses: mem_unit arms, PIU MISALIGN (reviews/contracts/misalign.md, r21 BUG-182)
 #   tb_cmpbr      compare to BR with an immediate (reviews/contracts/cmpbr.md)
 #   tb_brnew      brn/brfn: branch on the BR written in its own packet (reviews/contracts/brnew.md)
+#   tb_mwbr       two branches in one packet: slot-1 branch unit (reviews/contracts/mwbr.md, r24)
 #   tb_coherence  constrained-random MSI L1D/bus/L2 vs golden memory (4 seeds; + 6 seeds with DPF = 4)
 #   tb_l1i_pf / tb_l1d_pf  cache prefetch, directed (reviews/contracts/prefetch.md)
 #   tb_bus_lat    r12 bus latency / write buffers, directed timing (reviews/contracts/bus.md); tb_coherence_bus
@@ -65,6 +66,10 @@ run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt
 run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldbr.v
 run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v
 run tb_brnew           "$CORE"                             tb_brnew.v
+run tb_mwbr            "$CORE"                             tb_mwbr.v
+run tb_codex_r48_mwbr_edges "$CORE"                        tb_codex_r48_mwbr_edges.v
+run tb_codex_r48_mwbr_stall "$CORE"                        tb_codex_r48_mwbr_stall.v
+run tb_codex_r49_slot1_decode "$CORE"                    tb_codex_r49_slot1_decode.v
 run tb_codex_brnew_edges "$CORE"                           tb_codex_brnew_edges.v
 # cache prefetch (reviews/contracts/prefetch.md, r11)
 run tb_l1i_pf          "l1i_cache.v"                       tb_l1i_pf.v
