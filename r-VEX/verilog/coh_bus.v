@@ -57,6 +57,10 @@ module coh_bus #(
 
     reg [31:0] n_txn, n_c2c;
     reg [31:0] n_busy, n_wait;      // r12 statistics: cycles owned, master-cycles waiting for a grant
+    // r27 (BUG-291, qmodel.md QM-01 L3'/L4', bus.md BUS-08): statistics only, no effect on any cycle
+    reg [31:0] n_busy_wb, n_busy_pf;   // owned cycles of write-back / prefetch transactions (the rest are demand)
+    reg [31:0] n_wait_dem;             // master-cycles a demand request waited for a grant (prefetch waits excluded)
+    reg        cur_pf;                 // the owned transaction is a prefetch
     reg [N-1:0]  done_r;            // registered completion (FAST = 0)
     reg [127:0]  rline_r;
     // FAST: completion in the cycle the L2 (or the UPGR) finishes
@@ -112,10 +116,11 @@ module coh_bus #(
     end
 
     integer w;
-    reg [$clog2(N + 1)-1:0] nw;
+    reg [$clog2(N + 1)-1:0] nw, nwd;
     always @(*) begin
-        nw = 0;
+        nw = 0; nwd = 0;
         for (w = 0; w < N; w = w + 1) if (m_req[w] && !m_gnt[w]) nw = nw + 1;
+        for (w = 0; w < N; w = w + 1) if (m_req[w] && !m_gnt[w] && !m_pf[w]) nwd = nwd + 1;
     end
     always @(posedge clk) begin
         done_r <= {N{1'b0}};
@@ -124,13 +129,17 @@ module coh_bus #(
             busy <= 1'b0; owner <= 0; last <= N - 1; op <= OP_RD; flushed <= 1'b0;
             l2_req <= 1'b0; l2_we <= 1'b0; upgr_wait <= 1'b0; n_txn <= 0; n_c2c <= 0;
             n_busy <= 0; n_wait <= 0; done_d <= 1'b0;
+            n_busy_wb <= 0; n_busy_pf <= 0; n_wait_dem <= 0; cur_pf <= 1'b0;
         end else begin
             if (busy) n_busy <= n_busy + 1;
             n_wait <= n_wait + nw;
+            if (busy && op == OP_WB) n_busy_wb <= n_busy_wb + 1;
+            if (busy && op != OP_WB && cur_pf) n_busy_pf <= n_busy_pf + 1;
+            n_wait_dem <= n_wait_dem + nwd;
         end
         if (reset) begin
         end else if (grant) begin
-            busy <= 1'b1; owner <= pick; last <= pick; op <= s_op;
+            busy <= 1'b1; owner <= pick; last <= pick; op <= s_op; cur_pf <= m_pf[pick];
             n_txn <= n_txn + 1;
             flushed <= any_m; flush_line <= m_line;
             if (any_m) n_c2c <= n_c2c + 1;

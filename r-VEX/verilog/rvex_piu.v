@@ -13,6 +13,7 @@
 //   0x54 MULPKT (packets with a multiply)  0x58 SEMSTALL (DSTALL cycles waiting for hw_sem)
 //   0x5C SEMFAIL (committed ldw to hw_sem 0xFFxx that returned 1 = lock taken, 2026-11-04 r10, PIU-18)
 //   0x60 MISALIGN (committed slot-3 accesses not naturally aligned, 2026-11-10 r21, PIU-19, misalign.md MA-03)
+//   0x64 FLOP (committed FADD / FSUB / FMUL ops, one FLOP each, 2026-11-16 r27, PIU-20, fpu.md FP-07)
 // Events of a cycle are counted with the EN value held during that cycle;
 // a CTRL store takes effect at the end of its cycle, and CLR wins over the
 // increments of that cycle.
@@ -26,6 +27,7 @@ module rvex_piu (
     input  wire        active,     // running && !done
     input  wire        commit,     // the packet commits this cycle
     input  wire        xnop_c,     // XNOP bubble cycle
+    input  wire        fpstall_c,  // FP-12 / PIU-21 (r27): a packet with an FP op held for FPU stage 1
     input  wire        istall_c,   // held by an I-fetch miss
     input  wire        dstall_c,   // held by a D miss / hw_sem wait
     input  wire        semstall_c, // ... of which: waiting for hw_sem (address 0xFFxx)
@@ -38,6 +40,7 @@ module rvex_piu (
     input  wire        ctrl1,      // slot 1 holds a control op (mwbr.md MW-05, r24)
     input  wire        taken1,     // ... a slot-1 branch changed the PC (slot 0 did not)
     input  wire        mul1, mul2, // slot 1/2 op is a multiply
+    input  wire        fp1, fp2,   // slot 1/2 op is an FPU op (PIU-20: not a multiply, not ALU)
     input  wire        ld3, st3,   // slot 3 op is a load / a store
     // register port (slot 3)
     input  wire [7:2]  addr,       // word offset in the window
@@ -47,7 +50,7 @@ module rvex_piu (
 );
     reg        en;
     reg [63:0] cyc;
-    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign;
+    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign, flop, fpstall;
     reg [31:0] slot [0:3];
     integer k;
 
@@ -59,7 +62,8 @@ module rvex_piu (
     wire [2:0] n_ops = nz[0] + nz[1] + nz[2] + nz[3];
     wire [1:0] n_m16 = m16_1 + m16_2;
     wire [1:0] n_m32 = (md1 && !m16_1) + (md2 && !m16_2);
-    wire [2:0] n_alu = n_ops - (md1 + md2) - ld3 - st3 - ctrl0 - ctrl1;
+    wire [1:0] n_fp  = fp1 + fp2;
+    wire [2:0] n_alu = n_ops - (md1 + md2) - n_fp - ld3 - st3 - ctrl0 - ctrl1;
     wire       cnt = active && en;
     wire       cpk = cnt && commit;
 
@@ -90,6 +94,8 @@ module rvex_piu (
             6'h16: rdata = semstall;
             6'h17: rdata = semfail;
             6'h18: rdata = misalign;
+            6'h19: rdata = flop;
+            6'h1A: rdata = fpstall;     // PIU-21 (r27): 0xFE68
             default: rdata = 32'd0;
         endcase
     end
@@ -98,11 +104,12 @@ module rvex_piu (
         if (reset || (we && addr == 6'h00 && wdata[1])) begin
             cyc <= 64'd0; pkt <= 0; ops <= 0; alu <= 0; mul16 <= 0; mul32 <= 0; ld <= 0; st <= 0;
             ctl <= 0; brt <= 0; noppkt <= 0; xnop <= 0; istall <= 0; dstall <= 0; mulpkt <= 0; semstall <= 0; semfail <= 0;
-            misalign <= 0;
+            misalign <= 0; flop <= 0; fpstall <= 0;
             for (k = 0; k < 4; k = k + 1) slot[k] <= 0;
         end else begin
             if (cnt) cyc <= cyc + 64'd1;
             if (cnt && xnop_c)   xnop   <= xnop + 1;
+            if (cnt && fpstall_c) fpstall <= fpstall + 1;
             if (cnt && istall_c) istall <= istall + 1;
             if (cnt && dstall_c) dstall <= dstall + 1;
             if (cnt && dstall_c && semstall_c) semstall <= semstall + 1;
@@ -120,6 +127,7 @@ module rvex_piu (
                 if (md1 || md2) mulpkt <= mulpkt + 1;
                 if (semfail3) semfail <= semfail + 1;
                 if (misal3) misalign <= misalign + 1;
+                flop  <= flop + n_fp;
                 for (k = 0; k < 4; k = k + 1) if (nz[k]) slot[k] <= slot[k] + 1;
             end
         end

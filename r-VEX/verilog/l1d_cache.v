@@ -131,6 +131,7 @@ module l1d_cache #(
     reg [31:0] n_pf, n_pfhit, n_pfkill;
     reg [31:0] n_pfuseless, n_pflate;   // valid entry overwritten unused / demand miss waited for its prefetch
     reg [31:0] n_wbb, n_wbbsnp, n_fwd;  // r12: victims parked / buffer supplied a snoop / fills forwarded
+    reg [31:0] n_nobus;                 // r27 (BUG-291, bus.md BUS-09): core D-stall cycles with no own bus request or transaction
 
     // ---- write-back buffer (WBB) ----
     reg          wv;                               // holds a dirty victim (owner copy)
@@ -294,10 +295,11 @@ module l1d_cache #(
             busy <= 1'b0; cur_op <= OP_RD; cur_addr <= {AW{1'b0}};
             n_hit <= 0; n_miss <= 0; n_wb <= 0; n_upgr <= 0; n_inval <= 0; n_flush <= 0;
             n_pf <= 0; n_pfhit <= 0; n_pfkill <= 0; n_pfuseless <= 0; n_pflate <= 0; rp <= 0; cur_pf <= 1'b0; cur_pb <= 0;
-            n_wbb <= 0; n_wbbsnp <= 0; n_fwd <= 0; wv <= 1'b0; wa <= {(AW-4){1'b0}}; cur_wbb <= 1'b0;
+            n_wbb <= 0; n_wbbsnp <= 0; n_fwd <= 0; n_nobus <= 0; wv <= 1'b0; wa <= {(AW-4){1'b0}}; cur_wbb <= 1'b0;
             for (k = 0; k < NP; k = k + 1) begin pv[k] <= 1'b0; pp[k] <= 1'b0; pa[k] <= {LA{1'b0}}; ob[k] <= {NP{1'b0}}; end
             for (k = 0; k < NH; k = k + 1) begin hv[k] <= 1'b0; hist[k] <= {LA{1'b0}}; end
         end else begin
+            if (c_req && !c_ready && !busy && !b_req) n_nobus <= n_nobus + 1;   // statistics only
             // core hit: store data / count
             if (c_ready) begin
                 if (fwd) n_fwd <= n_fwd + 1; else n_hit <= n_hit + 1;

@@ -101,6 +101,10 @@
 `define MUL_MPYHU   7'b0001010
 `define MUL_MPYHS   7'b0001011
 
+// ---- FPU opcodes (round r27, reviews/contracts/fpu.md; slots 1-2 like MUL; free 000xxxx codes 12..14) ----
+`define FPU_FADD    7'b0001100
+`define FPU_FSUB    7'b0001101
+`define FPU_FMUL    7'b0001110
 // ---- MEM opcodes ----
 `define MEM_LDW     7'b0010001
 `define MEM_LDH     7'b0010010

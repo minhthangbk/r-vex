@@ -13,9 +13,9 @@ module tb_codex_piu_edges;
     integer pass = 0, fail = 0, a;
 
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
-        .xnop_c(xnop_c), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
+        .xnop_c(xnop_c), .fpstall_c(1'b0), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3), .ctrl0(ctrl0),
-        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .ld3(ld3), .st3(st3),
+        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .fp1(1'b0), .fp2(1'b0), .ld3(ld3), .st3(st3),
         .addr(addr), .rdata(rdata), .we(we), .wdata(wdata));
 
     always #5 clk = ~clk;
@@ -57,8 +57,13 @@ module tb_codex_piu_edges;
         chk("CYCLEH carry", dut.cyc[63:32], 1);
         active = 0;
 
+        // r27 (Codex R54 F8): 0x64 FLOP (PIU-20) and 0x68 FPSTALL (PIU-21) read their registers, not 0
+        dut.flop = 32'h0000_0F10; dut.fpstall = 32'h0000_0F57;
+        addr = 6'h19; #1; chk("PIU-20 FLOP readback at 0x64", rdata, 32'h0000_0F10);
+        addr = 6'h1A; #1; chk("PIU-21 FPSTALL readback at 0x68", rdata, 32'h0000_0F57);
+        dut.flop = 0; dut.fpstall = 0;
         // PIU-02: every unimplemented word offset, not just 0x54, reads zero.
-        for (a = 6'h19; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19)
+        for (a = 6'h1B; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19), 0x64 FLOP / 0x68 FPSTALL r27 (PIU-20/21): first hole 0x6C
             addr = a[5:0]; #1;
             if (rdata !== 0) begin
                 fail = fail + 1;

@@ -67,7 +67,7 @@ module tb_codex_piu_r11;
 
         // Core is_mul is deliberately broad, but PIU-08 narrows 12..15 back
         // to ALU and PIU-16 must use that same narrowed definition.
-        i_rdata = {64'd0, rr(7'd12, 6'd23, 6'd0, 6'd0), 32'd0};
+        i_rdata = {64'd0, rr(7'd15, 6'd23, 6'd0, 6'd0), 32'd0};   // r27 (fpu.md FP-07): 12..14 are FADD/FSUB/FMUL now; 15 stays an undefined 000xxxx code
         @(posedge clk); #1;
         chk("undefined opcode is ALU", dut.u_piu.alu, 1);
         chk("undefined opcode not MULPKT", dut.u_piu.mulpkt, 1);

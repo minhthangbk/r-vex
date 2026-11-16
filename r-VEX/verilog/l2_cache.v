@@ -62,6 +62,8 @@ module l2_cache #(
 
     reg [31:0] n_hit, n_miss, n_wb;
     reg [31:0] n_wbuf, n_mwait;    // r12: victims posted, cycles a memory access waited for the write behind
+    reg [31:0] n_wbbusy;           // r27 (BUG-291, L2WB-07): cycles the memory channel is busy with a write behind
+    reg [31:0] n_wmiss;            // r27 (BUG-291, qmodel.md QM-01 L3): write lookups that miss (no fetch: L2_LAT + 1)
 
     localparam S_IDLE = 3'd0, S_LOOK = 3'd1, S_WBACK = 3'd2, S_FETCH = 3'd3, S_MWAIT = 3'd4;
     reg [2:0]  state;
@@ -88,10 +90,11 @@ module l2_cache #(
         if (reset) begin
             for (k = 0; k < SETS; k = k + 1) begin vld[k] <= 1'b0; drt[k] <= 1'b0; end
             state <= S_IDLE; cnt <= 0; n_hit <= 0; n_miss <= 0; n_wb <= 0;
-            n_wbuf <= 0; n_mwait <= 0; wb_pend <= 1'b0; wb_busy <= 1'b0; wb_cnt <= 0;
+            n_wbuf <= 0; n_mwait <= 0; wb_pend <= 1'b0; wb_busy <= 1'b0; wb_cnt <= 0; n_wbbusy <= 0; n_wmiss <= 0;
         end else begin
             // WBUF: the write behind occupies the memory channel for MEM_LAT cycles
             if (wb_busy) begin
+                n_wbbusy <= n_wbbusy + 1;
                 if (wb_cnt != 0) wb_cnt <= wb_cnt - 1; else wb_busy <= 1'b0;
             end
             if (look_now) begin
@@ -102,6 +105,7 @@ module l2_cache #(
                     done <= 1'b1; state <= S_IDLE;
                 end else begin
                     n_miss <= n_miss + 1;
+                    if (we) n_wmiss <= n_wmiss + 1;
                     if (WBUF && ((vld[idx] && drt[idx]) || !we) && !mem_free) begin
                         state <= S_MWAIT;           // L2WB-02: one memory channel
                     end else if (vld[idx] && drt[idx]) begin

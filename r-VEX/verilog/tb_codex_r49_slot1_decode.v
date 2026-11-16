@@ -3,7 +3,9 @@
 
 /* Round 49 review probe: defined, reserved, and wrong-slot opcode behaviour in
  * slot 1.  This is deliberately not an ISA legality test; it records the RTL
- * side effects and PIU classification around mwbr.md MW-01..05. */
+ * side effects and PIU classification around mwbr.md MW-01..05.
+ * r27 (BUG-320, fpu.md FP-08): an op the slot-1 units do not decode writes no GR
+ * (before r27 it wrote the unit's 0 result, the "legacy zero WB" rows). */
 module tb_codex_r49_slot1_decode;
   reg clk=0, reset=1, start=0;
   wire done; wire [31:0] cycles;
@@ -45,15 +47,15 @@ module tb_codex_r49_slot1_decode;
     chk("STOP CTRL",dut.u_piu.ctl,0); chk("STOP SLOT1",dut.u_piu.slot[1],1);
 
     run1(rr(`MEM_PFT,6'd12,6'd2));
-    chk("wrong-slot PFT legacy zero WB",dut.gr[12],0);
+    chk("wrong-slot PFT no WB (BUG-320, fpu.md FP-08)",dut.gr[12],32'hcafe1234);
     chk("wrong-slot PFT ALU",dut.u_piu.alu,1);
 
     run1(rr(`MEM_LDW,6'd12,6'd2));
-    chk("wrong-slot load legacy zero WB",dut.gr[12],0);
+    chk("wrong-slot load no WB (BUG-320, fpu.md FP-08)",dut.gr[12],32'hcafe1234);
     chk("wrong-slot load no LD",dut.u_piu.ld,0);
 
     run1(rr(`MEM_STW,6'd12,6'd2));
-    chk("wrong-slot store legacy zero WB",dut.gr[12],0);
+    chk("wrong-slot store no WB (BUG-320, fpu.md FP-08)",dut.gr[12],32'hcafe1234);
     chk("wrong-slot store no memory",dut.dmem[0],32'h11223344);
     chk("wrong-slot store no ST",dut.u_piu.st,0);
 
@@ -66,7 +68,7 @@ module tb_codex_r49_slot1_decode;
     chk("reserved CTRL-class not ALU",dut.u_piu.alu,0);
 
     run1(rr(7'h69,6'd12,6'd2));
-    chk("unknown legacy zero WB",dut.gr[12],0);
+    chk("unknown no WB (BUG-320, fpu.md FP-08)",dut.gr[12],32'hcafe1234);
     chk("unknown ALU",dut.u_piu.alu,1);
 
     $display("CODEX R49 SLOT1 DECODE: %0d passed, %0d failed",pass,fail);

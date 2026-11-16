@@ -36,13 +36,15 @@
 //======================================================================
 `include "rvex_defs.vh"
 `include "rvex_piu.v"
+`include "fpu.v"
 
 module rvex_core #(
     parameter PC_W     = 12,
     parameter DMEM_AW  = 16,
     parameter EXT_DMEM = 0,
     parameter EXT_IMEM = 0,
-    parameter PIU      = 1
+    parameter PIU      = 1,
+    parameter FPU      = 1     // r27 (fpu.md): binary32 FADD/FSUB/FMUL in slots 1-2; 0 = no FPU (codes 12..14 undefined: write nothing, BUG-320)
 ) (
     input  wire clk,
     input  wire reset,
@@ -106,6 +108,9 @@ module rvex_core #(
     function is_mul; input [6:0] op; begin
         is_mul = (op[6:4] == 3'b000) && (op != `OP_NOP); end
     endfunction
+    function is_fpu; input [6:0] op; begin   // fpu.md FP-01: FADD / FSUB / FMUL (slots 1-2 only)
+        is_fpu = FPU && ((op == `FPU_FADD) || (op == `FPU_FSUB) || (op == `FPU_FMUL)); end
+    endfunction
     function is_addcg_divs; input [6:0] op; begin
         is_addcg_divs = (op[6:3]==`ALU_ADDCG4) || (op[6:3]==`ALU_DIVS4); end
     endfunction
@@ -157,6 +162,15 @@ module rvex_core #(
     wire [31:0] mul1_r, mul2_r; wire mul1_v, mul2_v, mul1_o, mul2_o;
     mul u_mul1(.mulop(op1),.src1(gr_r1_1),.src2(a2_1),.result(mul1_r),.overflow(mul1_o),.out_valid(mul1_v));
     mul u_mul2(.mulop(op2),.src1(gr_r1_2),.src2(a2_2),.result(mul2_r),.overflow(mul2_o),.out_valid(mul2_v));
+    wire [31:0] fpu1_r, fpu2_r; wire fpu1_v, fpu2_v;
+    wire        fp_wait;                 // FP-12, below
+    generate if (FPU) begin : g_fpu
+        // FP-12 (r27): two stages; the stage register loads while the packet is held one cycle (fp_wait)
+        fpu #(.PIPE(1)) u_fpu1(.clk(clk),.ld(fp_wait),.fpuop(op1),.src1(gr_r1_1),.src2(a2_1),.result(fpu1_r),.out_valid(fpu1_v));
+        fpu #(.PIPE(1)) u_fpu2(.clk(clk),.ld(fp_wait),.fpuop(op2),.src1(gr_r1_2),.src2(a2_2),.result(fpu2_r),.out_valid(fpu2_v));
+    end else begin : g_nofpu
+        assign fpu1_r = 32'd0; assign fpu2_r = 32'd0; assign fpu1_v = 1'b0; assign fpu2_v = 1'b0;
+    end endgenerate
 
     // ---- memory unit (slot 3) ----
     wire [31:0] mem_ea        = gr_r1_3 + {23'b0, syl3[10:2]};
@@ -223,14 +237,24 @@ module rvex_core #(
     wire [PC_W-1:0] c1_target = syl1[5+PC_W-1:5];
 
     // ---- per-slot GR result select (ALU vs MUL) ----
-    wire [31:0] res1 = is_mul(op1) ? mul1_r : alu1_r;
-    wire [31:0] res2 = is_mul(op2) ? mul2_r : alu2_r;
+    wire [31:0] res1 = is_fpu(op1) ? fpu1_r : is_mul(op1) ? mul1_r : alu1_r;
+    wire [31:0] res2 = is_fpu(op2) ? fpu2_r : is_mul(op2) ? mul2_r : alu2_r;
+    // BUG-320 (r27, review rule RR-03): the slot's unit must decode the op, as slot 0 does (alu0_v): an undefined
+    // opcode writes nothing (it wrote the unit's 0 result before r27)
+    wire        val1 = is_fpu(op1) ? fpu1_v : is_mul(op1) ? mul1_v : alu1_v;
+    wire        val2 = is_fpu(op2) ? fpu2_v : is_mul(op2) ? mul2_v : alu2_v;
 
     // ---- external data port / miss stall ----
     assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
     assign i_addr  = pc;
     wire   fstall  = i_req && !i_ready;          // packet not fetched yet
-    wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop;
+    // FP-12 (r27, user decision after the fmax A/B): a packet with an FP op in slot 1 or 2 is held for one cycle
+    // (fp_wait: stage 1 of the FPU fills its register; nothing commits, no memory access is presented), then issues
+    // with fp_ph = 1 (stage 2 result written back). Its operands cannot change while it is held (no commit).
+    reg    fp_ph;
+    wire   fp_pkt  = is_fpu(op1) || is_fpu(op2);
+    assign fp_wait = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && fp_pkt && !fp_ph;
+    wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && !fp_wait;
     wire mem_acc = (op3[6:4] == 3'b001) && (mem_is_load || mem_is_store);
     assign d_req   = EXT_DMEM && issue && mem_acc && !piu_hit;
     assign d_we    = mem_is_store;
@@ -243,12 +267,13 @@ module rvex_core #(
     wire   active  = running && !done;
     wire   commit  = issue && !dstall;
     rvex_piu u_piu(.clk(clk), .reset(reset),
-        .active(active), .commit(commit), .xnop_c(active && stall_cnt != 0),
+        .active(active), .commit(commit), .xnop_c(active && stall_cnt != 0), .fpstall_c(fp_wait),
         .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall), .semstall_c(&mem_ea[DMEM_AW-1:8]),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3),
         .ctrl0(slot0_is_ctrl), .taken0(slot0_is_ctrl && c_taken && !c_xnop),
         .ctrl1(slot1_is_ctrl), .taken1(c1_taken),   // mwbr.md MW-05
         .mul1(is_mul(op1)), .mul2(is_mul(op2)),
+        .fp1(is_fpu(op1)), .fp2(is_fpu(op2)),        // PIU-20 FLOP (fpu.md FP-07)
         .ld3(mem_acc && mem_is_load), .st3(mem_acc && mem_is_store),
         // PIU-18: a test-and-set ldw on hw_sem (system only: EXT_DMEM) that found the lock taken
         // window decoded like rvex_system (d_addr[AW-1:8] all ones; Codex R20 C-1: [15:8] was wrong for AW != 16)
@@ -262,7 +287,7 @@ module rvex_core #(
     always @(posedge clk) begin
         if (reset) begin
             pc <= {PC_W{1'b0}}; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
-            stall_cycles <= 32'd0; istall_cycles <= 32'd0;
+            stall_cycles <= 32'd0; istall_cycles <= 32'd0; fp_ph <= 1'b0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
         end else begin
@@ -275,6 +300,8 @@ module rvex_core #(
                     istall_cycles <= istall_cycles + 1;  // I-cache miss: no packet yet
                 end else if (dstall) begin
                     stall_cycles <= stall_cycles + 1;    // D-cache miss: hold the packet
+                end else if (fp_wait) begin
+                    fp_ph <= 1'b1;                       // FP-12: FPU stage 1, hold the packet one cycle
                 end else if (slot0_is_stop) begin
                     done <= 1'b1;                        // STOP
                 end else begin
@@ -300,7 +327,7 @@ module rvex_core #(
                     else if (is_addcg_divs(op1)) begin
                         if (dst1 != 6'd0) gr[dst1] <= alu1_r; br[dbr1] <= alu1_c;
                     end else if (is_cmp(op1) && dst1 == 6'd0) br[dbr1] <= alu1_r[0];
-                    else if (op1 != `OP_NOP && dst1 != 6'd0) gr[dst1] <= res1;
+                    else if (op1 != `OP_NOP && val1 && dst1 != 6'd0) gr[dst1] <= res1;
 
                     //--------------- writeback slot 2 ---------------
                     if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
@@ -308,7 +335,7 @@ module rvex_core #(
                     else if (is_addcg_divs(op2)) begin
                         if (dst2 != 6'd0) gr[dst2] <= alu2_r; br[dbr2] <= alu2_c;
                     end else if (is_cmp(op2) && dst2 == 6'd0) br[dbr2] <= alu2_r[0];
-                    else if (op2 != `OP_NOP && dst2 != 6'd0) gr[dst2] <= res2;
+                    else if (op2 != `OP_NOP && val2 && dst2 != 6'd0) gr[dst2] <= res2;
 
                     //--------------- writeback slot 3 (ALU or MEM) ---------------
                     if (op3[6:4] == 3'b001) begin           // MEM range
@@ -320,9 +347,10 @@ module rvex_core #(
                     else if (is_addcg_divs(op3)) begin
                         if (dst3 != 6'd0) gr[dst3] <= alu3_r; br[dbr3] <= alu3_c;
                     end else if (is_cmp(op3) && dst3 == 6'd0) br[dbr3] <= alu3_r[0];
-                    else if (op3 != `OP_NOP && dst3 != 6'd0) gr[dst3] <= alu3_r;
+                    else if (op3 != `OP_NOP && alu3_v && dst3 != 6'd0) gr[dst3] <= alu3_r;
 
                     //--------------- PC / stall update ---------------
+                    fp_ph <= 1'b0;                          // FP-12: the next packet starts in stage 1
                     if (slot0_is_ctrl && c_xnop) begin
                         stall_cnt <= c_xnop_n;              // NEW: XNOP stall n cycles
                         pc <= pc + 1'b1;
