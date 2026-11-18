@@ -67,7 +67,8 @@ module tb_codex_r49_slot1_decode;
     chk("reserved CTRL-class CTRL",dut.u_piu.ctl,1);
     chk("reserved CTRL-class not ALU",dut.u_piu.alu,0);
 
-    run1(rr(7'h69,6'd12,6'd2));
+    // r28 (simd16.md SM-07): 0x69 became dot2; 0x42 is still an unused code (between ADD 0x41 and AND 0x43)
+    run1(rr(7'h42,6'd12,6'd2));
     chk("unknown no WB (BUG-320, fpu.md FP-08)",dut.gr[12],32'hcafe1234);
     chk("unknown ALU",dut.u_piu.alu,1);
 

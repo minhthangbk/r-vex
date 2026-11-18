@@ -5,7 +5,7 @@
 `include "rvex_defs.vh"
 module tb_fpu;
     reg  [6:0]  op;  reg [31:0] a, b, want; wire [31:0] r; wire v;
-    integer fd, n, k, bad, nv, sel;
+    integer fd, n, k, bad, nv, sel, nexp;
     reg clk = 1'b0, ld = 1'b0; reg [6:0] op_s; reg [31:0] a_s, b_s; wire [31:0] r2; wire v2;
     fpu dut(.clk(1'b0), .ld(1'b0), .fpuop(op), .src1(a), .src2(b), .result(r), .out_valid(v));
     fpu #(.PIPE(1)) dut2(.clk(clk), .ld(ld), .fpuop(op), .src1(a), .src2(b), .result(r2), .out_valid(v2));
@@ -37,6 +37,10 @@ module tb_fpu;
         // an opcode that is not an FPU op is not valid (the core keeps its old result path)
         op = `MUL_MPYLL; a = 32'h3F800000; b = 32'h3F800000; #1;
         if (v) begin bad = bad + 1; $display("FPU MISMATCH out_valid for MPYLL"); end
+        // final verify r28 F9 sweep (BUG-355): exactly the count the generator wrote (fpu_vec.n), not just nv > 0
+        nexp = -1; fd = $fopen("fpu_vec.n", "r");
+        if (fd != 0) begin n = $fscanf(fd, "%d", nexp); $fclose(fd); end
+        if (nv != nexp || nexp < 1000) begin bad = bad + 1; $display("FPU FAIL vectors read %0d, expected %0d", nv, nexp); end
         $display("FPU %s vectors %0d mismatches %0d", bad == 0 ? "PASS" : "FAIL", nv, bad);
         $display("RESULT: FPU %s", (bad == 0 && nv > 0) ? "PASSED" : "FAILED");
         $finish;

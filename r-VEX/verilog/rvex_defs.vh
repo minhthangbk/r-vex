@@ -105,6 +105,16 @@
 `define FPU_FADD    7'b0001100
 `define FPU_FSUB    7'b0001101
 `define FPU_FMUL    7'b0001110
+// ---- SIMD16 dual-MAC opcodes (round r28, reviews/contracts/simd16.md SM-07; slots 1-2 like MUL) ----
+// free codes outside every range decoder: 0x69..0x6F above ANDL, 0x40 below ADD
+`define SM_DOT2     7'b1101001
+`define SM_DOTN2    7'b1101010
+`define SM_XDOT2    7'b1101011
+`define SM_XDOTN2   7'b1101100
+`define SM_DOT2A    7'b1101101
+`define SM_DOTN2A   7'b1101110
+`define SM_XDOT2A   7'b1101111
+`define SM_XDOTN2A  7'b1000000
 // ---- MEM opcodes ----
 `define MEM_LDW     7'b0010001
 `define MEM_LDH     7'b0010010

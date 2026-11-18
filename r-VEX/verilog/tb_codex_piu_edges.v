@@ -9,14 +9,17 @@ module tb_codex_piu_edges;
     reg [5:0] addr = 0;
     reg we = 0;
     reg [31:0] wdata = 0;
-    wire [31:0] rdata;
+    wire [31:0] rdata, rdata2;
+    reg  [7:2]  addr2 = 6'h00;   // r28 (MEM2-01): the slot-2 window read port
     integer pass = 0, fail = 0, a;
 
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
         .xnop_c(xnop_c), .fpstall_c(1'b0), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
+        .semfail2(1'b0), .misal2(1'b0), .memseq_c(1'b0), .ld2(1'b0), .st2(1'b0),     // r28 mem2.md: slot 2 idle here
         .op0(op0), .op1(op1), .op2(op2), .op3(op3), .ctrl0(ctrl0),
-        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .fp1(1'b0), .fp2(1'b0), .ld3(ld3), .st3(st3),
-        .addr(addr), .rdata(rdata), .we(we), .wdata(wdata));
+        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .fp1(1'b0), .fp2(1'b0), .sm1(1'b0), .sm2(1'b0), .ld3(ld3), .st3(st3),
+        .addr(addr), .rdata(rdata), .we(we), .wdata(wdata),
+        .addr2(addr2), .rdata2(rdata2), .we2(1'b0), .wdata2(32'd0));
 
     always #5 clk = ~clk;
 
@@ -61,9 +64,15 @@ module tb_codex_piu_edges;
         dut.flop = 32'h0000_0F10; dut.fpstall = 32'h0000_0F57;
         addr = 6'h19; #1; chk("PIU-20 FLOP readback at 0x64", rdata, 32'h0000_0F10);
         addr = 6'h1A; #1; chk("PIU-21 FPSTALL readback at 0x68", rdata, 32'h0000_0F57);
-        dut.flop = 0; dut.fpstall = 0;
+        // r28 (mem2.md MEM2-05): 0x6C MEMSEQ reads its register on both ports; the slot-2 port reads like slot 3
+        dut.memseq = 32'h0000_0A6C;
+        addr = 6'h1B; addr2 = 6'h1B; #1; chk("MEM2-05 MEMSEQ readback at 0x6C", rdata, 32'h0000_0A6C);
+        chk("MEM2-01 slot-2 port MEMSEQ readback", rdata2, 32'h0000_0A6C);
+        addr2 = 6'h19; #1; chk("MEM2-01 slot-2 port FLOP readback", rdata2, 32'h0000_0F10);
+        addr2 = 6'h00;
+        dut.flop = 0; dut.fpstall = 0; dut.memseq = 0;
         // PIU-02: every unimplemented word offset, not just 0x54, reads zero.
-        for (a = 6'h1B; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19), 0x64 FLOP / 0x68 FPSTALL r27 (PIU-20/21): first hole 0x6C
+        for (a = 6'h1C; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19), 0x64 FLOP / 0x68 FPSTALL r27 (PIU-20/21), 0x6C MEMSEQ r28 (MEM2-05): first hole 0x70
             addr = a[5:0]; #1;
             if (rdata !== 0) begin
                 fail = fail + 1;

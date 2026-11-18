@@ -37,6 +37,7 @@
 `include "rvex_defs.vh"
 `include "rvex_piu.v"
 `include "fpu.v"
+`include "simd16.v"
 
 module rvex_core #(
     parameter PC_W     = 12,
@@ -44,6 +45,8 @@ module rvex_core #(
     parameter EXT_DMEM = 0,
     parameter EXT_IMEM = 0,
     parameter PIU      = 1,
+    parameter DUAL_D   = 0,    // r28 (mem2.md MEM2-10): second data port d2_* to a dual-port L1D (hit only)
+    parameter SIMD16   = 1,    // r28 (simd16.md): dual 16x16 MAC ops in slots 1-2; 0 = codes undefined (write nothing)
     parameter FPU      = 1     // r27 (fpu.md): binary32 FADD/FSUB/FMUL in slots 1-2; 0 = no FPU (codes 12..14 undefined: write nothing, BUG-320)
 ) (
     input  wire clk,
@@ -59,6 +62,13 @@ module rvex_core #(
     output wire        d_word,     // the access is ldw/stw (hw_sem accepts only these)
     input  wire [31:0] d_rdata,
     input  wire        d_ready,
+    // second data port (DUAL_D=1, r28 MEM2-10): the second access of a packet, completes only with a port-1 hit
+    output wire        d2_req,
+    output wire        d2_we,
+    output wire [31:0] d2_addr,
+    output wire [31:0] d2_wdata,
+    input  wire [31:0] d2_rdata,
+    input  wire        d2_hit,
     output reg  [31:0] stall_cycles,     // cycles held by D-side misses
     // external instruction port (EXT_IMEM=1, to an L1 I-cache)
     output wire              i_req,
@@ -89,7 +99,10 @@ module rvex_core #(
     wire [1:0] imt0=syl0[24:23], imt1=syl1[24:23], imt2=syl2[24:23], imt3=syl3[24:23];
     wire [5:0] dst0=syl0[22:17], dst1=syl1[22:17], dst2=syl2[22:17], dst3=syl3[22:17];
     wire [5:0] r1a0=syl0[16:11], r1a1=syl1[16:11], r1a2=syl2[16:11], r1a3=syl3[16:11];
-    wire [5:0] r2a0=syl0[10:5],  r2a1=syl1[10:5],  r2a2=syl2[10:5];
+    wire [5:0] r2a0=syl0[10:5],  r2a1=syl1[10:5];
+    // r28 (mem2.md MEM2-02): a slot-2 store reads its data GR from the dst field, as slot 3
+    wire       st2 = (op2 == `MEM_STW) || (op2 == `MEM_STH) || (op2 == `MEM_STB);
+    wire [5:0] r2a2 = st2 ? syl2[22:17] : syl2[10:5];
     // Stores read the data GR from the dst field; every other slot-3 op
     // (ALU, load) reads src2 from [10:5] like the other slots.
     wire       st3 = (op3 == `MEM_STW) || (op3 == `MEM_STH) || (op3 == `MEM_STB);
@@ -110,6 +123,9 @@ module rvex_core #(
     endfunction
     function is_fpu; input [6:0] op; begin   // fpu.md FP-01: FADD / FSUB / FMUL (slots 1-2 only)
         is_fpu = FPU && ((op == `FPU_FADD) || (op == `FPU_FSUB) || (op == `FPU_FMUL)); end
+    endfunction
+    function is_simd; input [6:0] op; begin   // simd16.md SM-07: 0x69..0x6F, 0x40 (slots 1-2 only)
+        is_simd = SIMD16 && (((op >= `SM_DOT2) && (op <= `SM_XDOT2A)) || (op == `SM_XDOTN2A)); end
     endfunction
     function is_addcg_divs; input [6:0] op; begin
         is_addcg_divs = (op[6:3]==`ALU_ADDCG4) || (op[6:3]==`ALU_DIVS4); end
@@ -162,6 +178,10 @@ module rvex_core #(
     wire [31:0] mul1_r, mul2_r; wire mul1_v, mul2_v, mul1_o, mul2_o;
     mul u_mul1(.mulop(op1),.src1(gr_r1_1),.src2(a2_1),.result(mul1_r),.overflow(mul1_o),.out_valid(mul1_v));
     mul u_mul2(.mulop(op2),.src1(gr_r1_2),.src2(a2_2),.result(mul2_r),.overflow(mul2_o),.out_valid(mul2_v));
+    // simd16.md SM-01..05 (r28): the accumulate forms read GR[dst] of the packet (before its writes)
+    wire [31:0] sm1_r, sm2_r; wire sm1_v, sm2_v;
+    simd16 u_sm1(.op(op1),.a(gr_r1_1),.b(a2_1),.acc(gr[dst1]),.result(sm1_r),.out_valid(sm1_v));
+    simd16 u_sm2(.op(op2),.a(gr_r1_2),.b(a2_2),.acc(gr[dst2]),.result(sm2_r),.out_valid(sm2_v));
     wire [31:0] fpu1_r, fpu2_r; wire fpu1_v, fpu2_v;
     wire        fp_wait;                 // FP-12, below
     generate if (FPU) begin : g_fpu
@@ -181,11 +201,48 @@ module rvex_core #(
     // (R21-2: [15:8] alone also mapped 0x1FE00 to the PIU when DMEM_AW = 17)
     wire        piu_hit       = PIU && (op3[6:4] == 3'b001) && mem_ea[DMEM_AW-1:8] == 8'hFE;
     wire [31:0] piu_rdata;
-    wire [31:0] dmem_word     = piu_hit ? piu_rdata : EXT_DMEM ? d_rdata : dmem[dmem_word_addr];
+    wire [31:0] dmem_word     = piu_hit ? piu_rdata : EXT_DMEM ? ext_word3 : dmem[dmem_word_addr];
+    wire [31:0] dmem_word2, dmem_word3;   // r28 (mem2.md): the words the two memory units see
     wire [31:0] mem_load, mem_store; wire mem_is_load, mem_is_store, mem_v, mem_misal;
-    mem_unit u_mem(.opcode(op3),.mem_val(dmem_word),.reg_val(gr_r2_3),.pos(dmem_pos),
+    mem_unit u_mem(.opcode(op3),.mem_val(dmem_word3),.reg_val(gr_r2_3),.pos(dmem_pos),
                    .load_data(mem_load),.store_data(mem_store),
                    .is_load(mem_is_load),.is_store(mem_is_store),.out_valid(mem_v),.misal(mem_misal));
+
+    // ---- second memory unit (slot 2), r28 reviews/contracts/mem2.md ----
+    wire [31:0] mem_ea2       = gr_r1_2 + {23'b0, syl2[10:2]};
+    wire [DMEM_AW-1:0] dmem_byte_addr2 = mem_ea2[DMEM_AW-1:0];
+    wire [DMEM_AW-3:0] dmem_word_addr2 = dmem_byte_addr2[DMEM_AW-1:2];
+    wire [1:0] dmem_pos2      = mem_ea2[1:0];
+    wire        piu_hit2      = PIU && (op2[6:4] == 3'b001) && mem_ea2[DMEM_AW-1:8] == 8'hFE;
+    wire [31:0] piu_rdata2;
+    wire [31:0] mem_load2, mem_store2; wire mem2_is_load, mem2_is_store, mem2_v, mem2_misal;
+    mem_unit u_mem2(.opcode(op2),.mem_val(dmem_word2),.reg_val(gr_r2_2),.pos(dmem_pos2),
+                    .load_data(mem_load2),.store_data(mem_store2),
+                    .is_load(mem2_is_load),.is_store(mem2_is_store),.out_valid(mem2_v),.misal(mem2_misal));
+    wire mem2_acc  = (op2[6:4] == 3'b001) && (mem2_is_load || mem2_is_store);
+    wire mem3_acc  = (op3[6:4] == 3'b001) && (mem_is_load || mem_is_store);
+    // MEM2-03: loads read the memory before the packet; stores apply slot 2 then slot 3, so a slot-3 store to the word
+    // slot 2 stores merges into slot 2's word (bare: dmem; EXT: the phase order of MEM2-04 gives the same)
+    wire same_word = mem2_acc && mem3_acc && (mem_ea2[31:2] == mem_ea[31:2]) && (piu_hit2 == piu_hit);
+    // MEM2-04: two external accesses run one after the other on the d_* port; a slot-3 load goes first when slot 2
+    // stores, else slot 2 goes first. seq_ph = the first access completed (its load word kept in seq_rdata)
+    wire ext2 = EXT_DMEM && mem2_acc && !piu_hit2;
+    wire ext3 = EXT_DMEM && mem3_acc && !piu_hit;
+    wire two_ext = ext2 && ext3;
+    wire first3 = mem2_is_store && mem_is_load;           // the slot-3 load goes first
+    reg  seq_ph;
+    reg [31:0] seq_rdata;
+    wire cur3 = two_ext ? (seq_ph ? !first3 : first3) : ext3;   // the access on the port now is slot 3's
+    // MEM2-10 (r28, DUAL_D): in phase 0 the second access goes out on port 2 at the same time; when the dual-port L1D
+    // reports a hit for it (both plain hits, different words) the packet commits in this cycle without MEMSEQ
+    wire dual_try = (DUAL_D != 0) && two_ext && !seq_ph && !(same_word && mem2_is_store && mem_is_store);   // a load next to a store of its word reads the old word
+    wire p2_is3   = !first3;                              // port 2 carries the access phase 1 would do
+    wire [31:0] ext_word2 = (two_ext && seq_ph && first3 == 1'b0) ? seq_rdata : (dual_try && !p2_is3) ? d2_rdata : d_rdata;
+    wire [31:0] ext_word3 = (two_ext && seq_ph && first3 == 1'b1) ? seq_rdata : (dual_try && p2_is3) ? d2_rdata : d_rdata;
+    wire [31:0] base_word2 = piu_hit2 ? piu_rdata2 : EXT_DMEM ? ext_word2 : dmem[dmem_word_addr2];
+    assign dmem_word2 = base_word2;
+    // bare (or the PIU window) only: a slot-3 store merges into slot 2's stored word; in EXT mode the port already returns it
+    assign dmem_word3 = (same_word && mem2_is_store && mem_is_store && (piu_hit || !EXT_DMEM)) ? mem_store2 : dmem_word;
 
     // ---- control unit (slot 0) ----
     wire [PC_W-1:0] c_pc_goto; wire [31:0] c_link; wire c_taken, c_wlink, c_xnop, c_rfi, c_v;
@@ -237,12 +294,13 @@ module rvex_core #(
     wire [PC_W-1:0] c1_target = syl1[5+PC_W-1:5];
 
     // ---- per-slot GR result select (ALU vs MUL) ----
-    wire [31:0] res1 = is_fpu(op1) ? fpu1_r : is_mul(op1) ? mul1_r : alu1_r;
-    wire [31:0] res2 = is_fpu(op2) ? fpu2_r : is_mul(op2) ? mul2_r : alu2_r;
+    wire [31:0] res1 = is_fpu(op1) ? fpu1_r : is_simd(op1) ? sm1_r : is_mul(op1) ? mul1_r : alu1_r;
+    wire [31:0] res2 = is_fpu(op2) ? fpu2_r : is_simd(op2) ? sm2_r : is_mul(op2) ? mul2_r : alu2_r;
+    wire        slot2_is_mem = (op2[6:4] == 3'b001);      // r28 (MEM2-01): the slot-2 memory unit owns the 001xxxx range
     // BUG-320 (r27, review rule RR-03): the slot's unit must decode the op, as slot 0 does (alu0_v): an undefined
     // opcode writes nothing (it wrote the unit's 0 result before r27)
-    wire        val1 = is_fpu(op1) ? fpu1_v : is_mul(op1) ? mul1_v : alu1_v;
-    wire        val2 = is_fpu(op2) ? fpu2_v : is_mul(op2) ? mul2_v : alu2_v;
+    wire        val1 = is_fpu(op1) ? fpu1_v : is_simd(op1) ? sm1_v : is_mul(op1) ? mul1_v : alu1_v;
+    wire        val2 = is_fpu(op2) ? fpu2_v : is_simd(op2) ? sm2_v : is_mul(op2) ? mul2_v : slot2_is_mem ? 1'b0 : alu2_v;
 
     // ---- external data port / miss stall ----
     assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
@@ -255,39 +313,51 @@ module rvex_core #(
     wire   fp_pkt  = is_fpu(op1) || is_fpu(op2);
     assign fp_wait = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && fp_pkt && !fp_ph;
     wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && !fp_wait;
-    wire mem_acc = (op3[6:4] == 3'b001) && (mem_is_load || mem_is_store);
-    assign d_req   = EXT_DMEM && issue && mem_acc && !piu_hit;
-    assign d_we    = mem_is_store;
-    assign d_addr  = {mem_ea[31:2], 2'b00};
-    assign d_wdata = mem_store;
-    assign d_word  = (op3 == `MEM_LDW) || (op3 == `MEM_STW);
+    wire mem_acc = mem3_acc;
+    assign d_req   = issue && (cur3 ? ext3 : ext2);
+    assign d_we    = cur3 ? mem_is_store : mem2_is_store;
+    assign d_addr  = cur3 ? {mem_ea[31:2], 2'b00} : {mem_ea2[31:2], 2'b00};
+    assign d_wdata = cur3 ? mem_store : mem_store2;
+    assign d_word  = cur3 ? ((op3 == `MEM_LDW) || (op3 == `MEM_STW)) : ((op2 == `MEM_LDW) || (op2 == `MEM_STW));
     wire   dstall  = d_req && !d_ready;
+    // MEM2-04 / MEM2-05: the first of two external accesses completed: hold the packet one cycle (MEMSEQ)
+    assign d2_req   = issue && dual_try;
+    assign d2_we    = p2_is3 ? mem_is_store : mem2_is_store;
+    assign d2_addr  = p2_is3 ? {mem_ea[31:2], 2'b00} : {mem_ea2[31:2], 2'b00};
+    assign d2_wdata = p2_is3 ? mem_store : mem_store2;
+    wire   dual_ok = dual_try && d2_hit;
+    wire   memseq  = d_req && d_ready && two_ext && !seq_ph && !dual_ok;
 
     // ---- performance indicator unit ----
     wire   active  = running && !done;
-    wire   commit  = issue && !dstall;
+    wire   commit  = issue && !dstall && !memseq;
     rvex_piu u_piu(.clk(clk), .reset(reset),
         .active(active), .commit(commit), .xnop_c(active && stall_cnt != 0), .fpstall_c(fp_wait),
-        .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall), .semstall_c(&mem_ea[DMEM_AW-1:8]),
+        .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall),
+        .semstall_c(cur3 ? &mem_ea[DMEM_AW-1:8] : &mem_ea2[DMEM_AW-1:8]), .memseq_c(memseq),
         .op0(op0), .op1(op1), .op2(op2), .op3(op3),
         .ctrl0(slot0_is_ctrl), .taken0(slot0_is_ctrl && c_taken && !c_xnop),
         .ctrl1(slot1_is_ctrl), .taken1(c1_taken),   // mwbr.md MW-05
         .mul1(is_mul(op1)), .mul2(is_mul(op2)),
         .fp1(is_fpu(op1)), .fp2(is_fpu(op2)),        // PIU-20 FLOP (fpu.md FP-07)
+        .sm1(is_simd(op1)), .sm2(is_simd(op2)),      // simd16.md SM-06: MUL16 and MULPKT (r28)
         .ld3(mem_acc && mem_is_load), .st3(mem_acc && mem_is_store),
+        .ld2(mem2_acc && mem2_is_load), .st2(mem2_acc && mem2_is_store),   // MEM2-05 (r28)
         // PIU-18: a test-and-set ldw on hw_sem (system only: EXT_DMEM) that found the lock taken
         // window decoded like rvex_system (d_addr[AW-1:8] all ones; Codex R20 C-1: [15:8] was wrong for AW != 16)
-        .semfail3(EXT_DMEM && op3 == `MEM_LDW && &mem_ea[DMEM_AW-1:8] && d_rdata[0]),
+        .semfail3(EXT_DMEM && op3 == `MEM_LDW && &mem_ea[DMEM_AW-1:8] && dmem_word3[0]),
+        .semfail2(EXT_DMEM && op2 == `MEM_LDW && &mem_ea2[DMEM_AW-1:8] && dmem_word2[0]),
         // PIU-19 (misalign.md MA-03, r21 BUG-182): a committed slot-3 access that is not naturally aligned
-        .misal3(mem_acc && mem_misal),
+        .misal3(mem_acc && mem_misal), .misal2(mem2_acc && mem2_misal),
         .addr(mem_ea[7:2]), .rdata(piu_rdata),
-        .we(commit && piu_hit && mem_is_store), .wdata(mem_store));
+        .we(commit && piu_hit && mem_is_store), .wdata(mem_store),
+        .addr2(mem_ea2[7:2]), .rdata2(piu_rdata2), .we2(commit && piu_hit2 && mem2_is_store), .wdata2(mem_store2));
 
     // ================= sequential execution =================
     always @(posedge clk) begin
         if (reset) begin
             pc <= {PC_W{1'b0}}; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
-            stall_cycles <= 32'd0; istall_cycles <= 32'd0; fp_ph <= 1'b0;
+            stall_cycles <= 32'd0; istall_cycles <= 32'd0; fp_ph <= 1'b0; seq_ph <= 1'b0; seq_rdata <= 32'd0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
         end else begin
@@ -300,6 +370,8 @@ module rvex_core #(
                     istall_cycles <= istall_cycles + 1;  // I-cache miss: no packet yet
                 end else if (dstall) begin
                     stall_cycles <= stall_cycles + 1;    // D-cache miss: hold the packet
+                end else if (memseq) begin
+                    seq_ph <= 1'b1; seq_rdata <= d_rdata; // MEM2-04: first access done, keep its word
                 end else if (fp_wait) begin
                     fp_ph <= 1'b1;                       // FP-12: FPU stage 1, hold the packet one cycle
                 end else if (slot0_is_stop) begin
@@ -330,7 +402,10 @@ module rvex_core #(
                     else if (op1 != `OP_NOP && val1 && dst1 != 6'd0) gr[dst1] <= res1;
 
                     //--------------- writeback slot 2 ---------------
-                    if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
+                    if (slot2_is_mem) begin                 // r28 (MEM2-01): slot-2 memory unit
+                        if (mem2_is_store && !EXT_DMEM && !piu_hit2) dmem[dmem_word_addr2] <= mem_store2;
+                        else if (mem2_is_load && dst2 != 6'd0) gr[dst2] <= mem_load2;
+                    end else if (op2 == `ALU_MTB) br[dbr2] <= alu2_c;
                     else if (bi2) br[syl2[19:17]] <= alu2_r[0];
                     else if (is_addcg_divs(op2)) begin
                         if (dst2 != 6'd0) gr[dst2] <= alu2_r; br[dbr2] <= alu2_c;
@@ -351,6 +426,7 @@ module rvex_core #(
 
                     //--------------- PC / stall update ---------------
                     fp_ph <= 1'b0;                          // FP-12: the next packet starts in stage 1
+                    seq_ph <= 1'b0;                         // MEM2-04: the next packet starts with its first access
                     if (slot0_is_ctrl && c_xnop) begin
                         stall_cnt <= c_xnop_n;              // NEW: XNOP stall n cycles
                         pc <= pc + 1'b1;

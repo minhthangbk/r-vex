@@ -41,7 +41,8 @@ module rvex_system #(
     parameter BUS_FAST = 1,        // coh_bus + l2_cache FAST: combinational completion, no L2 IDLE bubble
     parameter L1D_FWD  = 1,        // L1D forwards the fill to the core in the completion cycle
     parameter L1D_WBB  = 1,        // L1D one-line write-back (victim) buffer
-    parameter L2_WBUF  = 1         // L2 posted write buffer for dirty victims (read first)
+    parameter L2_WBUF  = 1,        // L2 posted write buffer for dirty victims (read first)
+    parameter L1D_DUAL = 1         // r28 (mem2.md MEM2-10): two hits per cycle (the two memory ops of a packet)
 ) (
     input  wire        clk,
     input  wire        reset,
@@ -85,6 +86,8 @@ module rvex_system #(
         // release a lock (Codex round 6: d_addr is word aligned and d_wdata a
         // merged word, so the lane is lost).
         wire        mmio_sub = mmio && !d_word;
+        wire        d2_req, d2_we, c2_hit; wire [31:0] d2_addr, d2_wdata, c2_rdata;
+        wire        mmio2 = &d2_addr[AW-1:8];      // MEM2-10: the dual path is for cached addresses only
         assign sem_req[g]  = d_req && mmio && d_word;
         assign sem_we[g]   = d_we;
         assign sem_idx[6*g +: 6] = d_addr[7:2];
@@ -93,10 +96,12 @@ module rvex_system #(
         assign d_rdata = mmio_sub ? 32'hFFFF_FFFF : mmio ? {31'd0, sem_rbit[g]} : c_rdata;
         wire [PC_W-1:0] i_addr;
         wire [127:0] i_rdata;
-        rvex_core #(.PC_W(PC_W), .DMEM_AW(AW), .EXT_DMEM(1), .EXT_IMEM(1)) core (
+        rvex_core #(.PC_W(PC_W), .DMEM_AW(AW), .EXT_DMEM(1), .EXT_IMEM(1), .DUAL_D(L1D_DUAL)) core (
             .clk(clk), .reset(reset), .start(start[g]), .done(done[g]), .cycles(cyc[g]),
             .d_req(d_req), .d_we(d_we), .d_addr(d_addr), .d_wdata(d_wdata), .d_word(d_word),
             .d_rdata(d_rdata), .d_ready(d_ready), .stall_cycles(stall_cycles),
+            .d2_req(d2_req), .d2_we(d2_we), .d2_addr(d2_addr), .d2_wdata(d2_wdata), .d2_rdata(c2_rdata),
+            .d2_hit(c2_hit && !mmio && !mmio2),
             .i_req(i_req), .i_addr(i_addr), .i_rdata(i_rdata), .i_ready(i_ready),
             .istall_cycles(istall_cycles));
         l1i_cache #(.PC_W(PC_W), .SETS(L1I_SETS), .FILL_LAT(IFILL_LAT), .WARM(L1I_WARM),
@@ -104,10 +109,12 @@ module rvex_system #(
             .clk(clk), .reset(reset), .i_req(i_req), .i_addr(i_addr),
             .i_rdata(i_rdata), .i_ready(i_ready));
         l1d_cache #(.AW(AW), .SETS(L1D_SETS), .DPF(L1D_DPF), .DPF_DEG(L1D_DEG),
-                    .DPF_HIST(L1D_HIST), .DPF_STR(L1D_STR), .DPF_AGE(L1D_AGE), .FWD(L1D_FWD), .WBB(L1D_WBB)) l1d (
+                    .DPF_HIST(L1D_HIST), .DPF_STR(L1D_STR), .DPF_AGE(L1D_AGE), .FWD(L1D_FWD), .WBB(L1D_WBB), .DUAL(L1D_DUAL)) l1d (
             .clk(clk), .reset(reset),
             .c_req(d_req && !mmio), .c_we(d_we), .c_addr(d_addr), .c_wdata(d_wdata),
             .c_rdata(c_rdata), .c_ready(c_ready),
+            .c2_req(d2_req && !mmio && !mmio2), .c2_we(d2_we), .c2_addr(d2_addr), .c2_wdata(d2_wdata),
+            .c2_rdata(c2_rdata), .c2_hit(c2_hit),
             .b_req(b_req[g]), .b_pf(b_pf[g]), .b_op(b_op[2*g +: 2]), .b_addr(b_addr[AW*g +: AW]),
             .b_wline(b_wline[128*g +: 128]), .b_gnt(b_gnt[g]), .b_done(b_done[g]),
             .b_rline(b_rline),

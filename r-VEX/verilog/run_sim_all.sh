@@ -66,11 +66,21 @@ run tb_codex_piu_r11     "$CORE"                               tb_codex_piu_r11.
 # r27 (reviews/contracts/fpu.md): binary32 FPU, unit vectors from the reference model, then through the core
 F32REF=${F32REF:-../../../toolchain/sim/f32ref.py}   # the gate runs a copy of this directory and passes the path
 [ -f "$F32REF" ] || { echo "FAIL tb_fpu: reference model $F32REF not found (set F32REF)"; exit 2; }
-python3 "$F32REF" vectors 200000 7 > fpu_vec.txt
+python3 "$F32REF" vectors 200000 7 > fpu_vec.txt || { echo "FAIL tb_fpu: f32ref.py vectors failed"; exit 2; }
+wc -l < fpu_vec.txt > fpu_vec.n   # final verify r28 F9 sweep (BUG-355): the bench must read every line
 run tb_fpu               "rvex_defs.vh fpu.v"                   tb_fpu.v
-rm -f fpu_vec.txt
+rm -f fpu_vec.txt fpu_vec.n
 run tb_fpu_core          "$CORE"                               tb_fpu_core.v
 run tb_r27_fp_hold       "$CORE"                               tb_r27_fp_hold.v
+run tb_mem2             "$CORE"                               tb_mem2.v
+run tb_mem2_sys         "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_mem2_sys.v
+# r28 (reviews/contracts/simd16.md): SIMD16 unit vectors from the reference model, then through the core
+SMREF=${SMREF:-../../../toolchain/sim/simd16ref.py}   # the gate runs a copy of this directory and passes the path
+[ -f "$SMREF" ] || { echo "FAIL tb_simd16: reference model $SMREF not found (set SMREF)"; exit 2; }
+python3 "$SMREF" vectors 20000 11 > simd16_vec.txt || { echo "FAIL tb_simd16: simd16ref.py vectors failed"; exit 2; }
+wc -l < simd16_vec.txt > simd16_vec.n   # final verify r28 F9 (BUG-355): the bench must read every line
+run tb_simd16           "$CORE"                               tb_simd16.v
+rm -f simd16_vec.txt simd16_vec.n
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v
 run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldbr.v
 run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v

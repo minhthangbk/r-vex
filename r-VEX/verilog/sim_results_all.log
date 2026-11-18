@@ -483,13 +483,18 @@ PASS CLR+EN cycle clear wins got=0
 PASS CLR+EN packet clear wins got=0
 PASS CYCLE low carry got=0
 PASS CYCLEH carry got=1
+PASS PIU-20 FLOP readback at 0x64 got=3856
+PASS PIU-21 FPSTALL readback at 0x68 got=3927
+PASS MEM2-05 MEMSEQ readback at 0x6C got=2668
+PASS 2-01 slot-2 port MEMSEQ readback got=2668
+PASS EM2-01 slot-2 port FLOP readback got=3856
 PASS opcode 12 OPS got=1
 PASS opcode 12 MUL16 got=0
 PASS opcode 12 MUL32 got=0
 PASS opcode 12 ALU got=1
-CODEX PIU EDGES: 48 passed, 0 failed
+CODEX PIU EDGES: 50 passed, 0 failed
 RESULT: CODEX PIU EDGES PASSED
-tb_codex_piu_edges.v:82: $finish called at 96000 (1ps)
+tb_codex_piu_edges.v:96: $finish called at 96000 (1ps)
 
 ### Building tb_codex_piu_core ###
 ### Running  tb_codex_piu_core ###
@@ -597,33 +602,211 @@ tb_codex_piu_r11.v:86: $finish called at 106000 (1ps)
 ### Running  tb_fpu ###
 FPU PASS vectors 202700 mismatches 0
 RESULT: FPU PASSED
-tb_fpu.v:42: $finish called at 1216201 (1s)
+tb_fpu.v:46: $finish called at 1216201 (1s)
 
 ### Building tb_fpu_core ###
 ### Running  tb_fpu_core ###
 PASS FP-12 held cycle writes nothing got=0000000000000000
 PASS FP-12 held cycle keeps the PC got=0000000000000000
-PASS 21 FPSTALL counts the held cycle got=0000000000000001
-PASS cket committed in the held cycle got=0000000000000000
+PASS PIU-21 FPSTALL counts the held cycle got=0000000000000001
+PASS PIU-21 no packet committed in the held cycle got=0000000000000000
 PASS FP-01 slot 1 fadd got=0000000040700000
 PASS FP-01 slot 2 fmul got=0000000040580000
-PASS et reads the result, slot 2 fsub got=000000003ec00000
+PASS FP-05 next packet reads the result, slot 2 fsub got=000000003ec00000
 PASS FP-01 fsub operand order, slot 1 got=00000000bec00000
 PASS FP-01 immediate operand pattern got=0000000000000002
 PASS FP-01 dst 0 writes nothing got=0000000000000000
-PASS 0 writes nothing (as before r27) got=0000000012345678
-PASS -08 FADD code in slot 3 writes 0 got=0000000000000000
-PASS FP-08 code 15 in slot 1 writes 0 got=0000000000000000
-PASS -20 FLOP counts slot 1-2 FPU ops got=0000000000000006
+PASS FP-08 FADD code in slot 0 writes nothing (as before r27) got=0000000012345678
+PASS FP-08 / BUG-320 FADD code in slot 3 writes nothing got=0000000012345678
+PASS FP-08 / BUG-320 code 15 in slot 1 writes nothing got=0000000012345678
+PASS PIU-20 FLOP counts slot 1-2 FPU ops got=0000000000000006
 PASS PIU-21 FPSTALL = 3 FP packets got=0000000000000003
-PASS  (no slot 1-2 FP op) is not held got=0000000000000004
+PASS PIU-21 packet 4 (no slot 1-2 FP op) is not held got=0000000000000004
 PASS PIU-12 OPS = ALU + ... + FLOP got=0000000000000009
-PASS FP-05 FPU=0 fadd writes 0 got=0000000000000000
-PASS FP-05 FPU=0 fmul writes 0 got=0000000000000000
+PASS FP-05 / BUG-320 FPU=0 fadd writes nothing got=0000000012345678
+PASS FP-05 / BUG-320 FPU=0 fmul writes nothing got=0000000012345678
 PASS FP-05 FPU=0 no FLOP got=0000000000000000
-FPU CORE: 20 passed, 0 failed
+PASS drain: STOP ends both cores (cap 4 cycles) got=0000000000000003
+PASS drain: no I or D request after STOP got=0000000000000000
+FPU CORE: 22 passed, 0 failed
 RESULT: FPU CORE PASSED
-tb_fpu_core.v:84: $finish called at 96000 (1ps)
+tb_fpu_core.v:90: $finish called at 116000 (1ps)
+
+### Building tb_r27_fp_hold ###
+### Running  tb_r27_fp_hold ###
+PASS run ends by STOP within the cap got=1
+PASS P0 fadd committed got=40700000
+PASS P0 one store handshake got=1
+PASS P0 store address got=10
+PASS P0 store data got=40100000
+PASS P0 D stall cycles got=2
+PASS no memory request in a held cycle got=0
+PASS P1 fmul committed after the I stall got=40580000
+PASS P1 no hold during the I stall got=0
+PASS P1 I stall cycles got=2
+PASS P2 fadd with the taken goto got=40400000
+PASS P3 skipped by the goto got=cafe
+PASS P4 fsub with the XNOP got=3ec00000
+PASS PIU-21 FPSTALL = 4 held packets got=4
+PASS PIU XNOP cycles got=2
+PASS PIU DSTALL cycles got=2
+PASS drain: no I request after STOP got=0
+PASS drain: no D request after STOP got=0
+RESULT: R27 FP HOLD PASSED (18 checks)
+tb_r27_fp_hold.v:98: $finish called at 216000 (1ps)
+
+### Building tb_mem2 ###
+### Running  tb_mem2 ###
+PASS both cores end by STOP within the cap got=1
+PASS C-01 bare ld+st: load reads the old word got=11223344
+PASS C-01 EXT  ld+st: load reads the old word got=11223344
+PASS C-01 bare store applied got=55667788
+PASS C-01 EXT  store applied got=55667788
+PASS C-02 bare st+ld: load reads the old word got=11223344
+PASS C-02 EXT  st+ld: load reads the old word got=11223344
+PASS C-02 EXT  slot-3 load presented before the slot-2 store got=1
+PASS C-02 bare store applied got=55667788
+PASS C-02 EXT  store applied got=55667788
+PASS C-03 bare stw+stw: slot 3 wins got=2020202
+PASS C-03 EXT  stw+stw: slot 3 wins got=2020202
+PASS C-04 bare stb+stb merge got=55663344
+PASS C-04 EXT  stb+stb merge got=55663344
+PASS C-05 bare sth+stb: slot 3 byte on top got=99883344
+PASS C-05 EXT  sth+stb: slot 3 byte on top got=99883344
+PASS C-06 bare ld+ld ldw got=11223344
+PASS C-06 bare ld+ld ldh got=3344
+PASS C-06 EXT  ld+ld ldw got=11223344
+PASS C-06 EXT  ld+ld ldh got=3344
+PASS C-07 bare WAR: load old got=11223344
+PASS C-07 EXT  WAR: load old got=11223344
+PASS C-07 bare WAR: store applied got=5
+PASS C-08 bare st+ld other words: load got=aabbccdd
+PASS C-08 EXT  st+ld other words: load got=aabbccdd
+PASS C-08 EXT  store applied got=5
+PASS C-09 bare crossing sth in slot 2 leaves the word got=11223344
+PASS C-09 EXT  crossing sth in slot 2 leaves the word got=11223344
+PASS C-09 bare crossing ldh reads 0 got=0
+PASS C-09 bare MISALIGN counts both slots got=2
+PASS C-09 EXT  MISALIGN counts both slots got=2
+PASS C-10 bare slot-2 PIU read (ID) got=50495501
+PASS C-10 EXT  slot-2 PIU read (ID) got=50495501
+PASS C-10 bare slot-3 PKT read (9 packets before) got=9
+PASS C-10 EXT  slot-3 PKT read (9 packets before) got=9
+PASS C-11 bare PIU store pair: slot 3 wins (EN = 1) got=1
+PASS C-11 EXT  PIU store pair: slot 3 wins (EN = 1) got=1
+PASS C-11 bare DMEM 0xFE00 untouched got=deadbeef
+PASS C-15 EXT  miss first: both loads got=3344ccdd
+PASS C-16 EXT  miss second: both loads got=3344ccdd
+PASS C-17 bare FP hold + slot-2 store got=5
+PASS C-17 EXT  the store is presented once got=1
+PASS C-17 fadd committed got=40700000
+PASS MEM2-05 bare LD counts both slots got=d
+PASS MEM2-05 bare ST counts both slots got=e
+PASS MEM2-05 bare MEMSEQ = 0 got=0
+PASS MEM2-05 EXT  MEMSEQ = two-access packets (C-14: 9 + C-15 + C-16) got=b
+PASS MEM2-05 EXT  DSTALL = the two 3-cycle misses got=6
+PASS MEM2-05 EXT  FPSTALL = 1 got=1
+PASS MEM2-05 bare cycle law got=10
+PASS MEM2-05 EXT  cycle law got=21
+PASS MEM2-05 bare = EXT packets got=e
+RESULT: MEM2 PASSED (52 checks)
+tb_mem2.v:147: $finish called at 366000 (1ps)
+
+### Building tb_mem2_sys ###
+### Running  tb_mem2_sys ###
+  PASS d, prefetch, WBB or bus request) : 1
+tb_mem2_sys: core 0 647 cycles, 3 dual commits, 3 MEMSEQ cycles
+  PASS run ends : 1
+  PASS D1 slot-2 load (A1) : a1a11111
+  PASS D1 slot-3 load (B0) : b0b00000
+  PASS D2 load next to a store (B0) : b0b00000
+  PASS e word before the packet's store : 66
+  PASS D5 load (A0) : a0a00000
+  PASS D6 hit load (A0) : a0a00000
+  PASS D6 miss load (C0) : c0c00000
+  PASS after D2, D3 (slot-2 store last) : 55
+  PASS A2 after the warm-up store : 55
+  PASS lot-3 byte on top of slot-2 word : 66000055
+  PASS D5 B1 after the upgrade : 55
+  PASS EM2-10 dual commits (D1, D2, D3) : 3
+  PASS M2-10 MEMSEQ cycles (D4, D5, D6) : 3
+tb_mem2_sys: D7 15 dual commits, 1 snoop-held port-2 cycles; D8..D11 3 dual, 3 MEMSEQ
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS D7 E_j word 0 (core 0 round 1) : 55
+  PASS D7 E_j word 4 (core 0 round 2) : 66
+  PASS D7 E_j word 8 (core 1) : 99
+  PASS D7 E_j word 12 (core 0 round 3) : 77
+  PASS uld-be dual port-2 store (reach) : 1
+  PASS D8 load of D (fill) : 0
+  PASS  A0 stored on the sequenced path : 77
+  PASS D9 hw_sem free lock reads 0 : 0
+  PASS D9 hw_sem taken lock reads 1 : 1
+  PASS IU ID read next to a cached load : 50495501
+  PASS 9 cached loads next to MMIO (F1) : 5500000055
+  PASS load next to a crossing sth (F1) : 55
+  PASS D10 crossing sth leaves F1 : 55
+  PASS before the pos-1 sth of its word : 0
+  PASS D10 pos-1 sth writes bytes 1..2 : 7700
+  PASS D11 loads after an xnop : 5500000000
+  PASS  of D9 sequenced (MEMSEQ cycles) : 3
+  PASS D10 (2 packets) and D11 dual : 3
+  PASS PIU MEMSEQ counter = held cycles : 10
+  PASS D12 slot-2 busy hw_sem ldw = 1 : 1
+  PASS D12 cached load next to it : 55
+  PASS D12 SEMFAIL D9 s3 + D12 s2 = 2 : 2
+  PASS D12 sequenced (MMIO, port 1) : 1
+RESULT: MEM2 SYS PASSED (66 checks)
+tb_mem2_sys.v:178: $finish called at 6525000 (1ps)
+
+### Building tb_simd16 ###
+### Running  tb_simd16 ###
+PASS SM-01..05 unit vectors match simd16ref.py (count of mismatches) got=0
+PASS SM unit vectors read (count) got=1
+PASS SM-07 an ALU code is not a simd16 op got=0
+PASS core run ends by STOP got=1
+PASS SM-01 slot 1 dot2 got=1f
+PASS SM-02 slot 2 dotn2 got=fffffff5
+PASS SM-05 slot 1 dot2a got=83
+PASS SM-05 slot 2 xdot2a (wrap) got=1c
+PASS SM-04 slot 1 xdotn2 got=1
+PASS SM-05 slot 2 xdotn2a got=6
+PASS SM-05 dotn2a accumulates got=3dd
+PASS SM-05 all reads before writes: slot 0 reads the old rD got=3e8
+PASS SM-03 slot 2 xdot2 got=1d
+PASS SM-06 slot 0 op writes nothing got=cafe
+PASS SM-06 slot 3 op writes nothing got=beef
+PASS SM-06 PIU MUL16 counts the 8 slot-1/2 ops got=8
+PASS SM-06 PIU MULPKT counts the 4 packets got=4
+PASS SM-06 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + flop got=b
+RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
+tb_simd16.v:85: $finish called at 20096000 (1ps)
 
 ### Building tb_verify_piu_pkt ###
 ### Running  tb_verify_piu_pkt ###
@@ -701,7 +884,7 @@ tb_codex_r48_mwbr_stall.v:61: $finish called at 116000 (1ps)
 ### Running  tb_codex_r49_slot1_decode ###
 CODEX R49 SLOT1 DECODE: 19 passed, 0 failed
 RESULT: CODEX R49 SLOT1 DECODE PASSED
-tb_codex_r49_slot1_decode.v:75: $finish called at 416000 (1ps)
+tb_codex_r49_slot1_decode.v:78: $finish called at 416000 (1ps)
 
 ### Building tb_codex_brnew_edges ###
 ### Running  tb_codex_brnew_edges ###
@@ -1654,6 +1837,10 @@ RESULT: CODEX PIU DUALCTRL PASSED
 RESULT: CODEX PIU R11 PASSED
 RESULT: FPU PASSED
 RESULT: FPU CORE PASSED
+RESULT: R27 FP HOLD PASSED (18 checks)
+RESULT: MEM2 PASSED (52 checks)
+RESULT: MEM2 SYS PASSED (66 checks)
+RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
 RESULT: VERIFY PIU PKT PASSED
 RESULT: CODEX CMPBR OLD-BR PASSED
 RESULT: VERIFY CMPBR PKT PASSED

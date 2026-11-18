@@ -64,6 +64,17 @@
 // buffer. The buffer is the owner copy: a snooped RD/RDX of its line gets
 // its data (flush to L2) and empties it.
 // FWD = WBB = 0 is the r11 cache, cycle for cycle.
+//
+// DUAL = 1 (2026-11-17 r28, mem2.md MEM2-10, user decision "L1D 2 cổng khi
+// hit"): a second core port (c2_*) for the second memory op of a packet. It
+// completes in the same cycle as port 1 (c2_hit) only when both are plain
+// hits: port 1 hits with no own miss in progress and no snoop on its index,
+// port 2 hits its line (a store needs M), no snoop on port 2's index, and the
+// core never sends two stores of one word (a load reads the word before the
+// edge, so a load next to a store of its word is served). Then a port-2 store writes the word at the clock edge
+// with port 1's. Otherwise c2_hit = 0 and the core sequences the two accesses
+// on port 1 (MEM2-04). The prefetch filters watch port 1 only.
+// DUAL = 0 is the r28 single-port cache, cycle for cycle.
 //======================================================================
 module l1d_cache #(
     parameter AW   = 16,          // physical byte-address bits
@@ -74,7 +85,8 @@ module l1d_cache #(
     parameter DPF_STR  = 0,       // r23: stride detector for the prefetch targets (0 = next-line only)
     parameter DPF_AGE  = 0,       // r23 (BUG-240): fetch the oldest pending entry first (0 = lowest index)
     parameter FWD      = 0,       // r12: forward the fill to the core in the completion cycle
-    parameter WBB      = 0        // r12: one-line write-back (victim) buffer
+    parameter WBB      = 0,       // r12: one-line write-back (victim) buffer
+    parameter DUAL     = 0        // r28 (mem2.md MEM2-10): second core port, hit only
 ) (
     input  wire         clk,
     input  wire         reset,
@@ -85,6 +97,13 @@ module l1d_cache #(
     input  wire [31:0]  c_wdata,
     output wire [31:0]  c_rdata,
     output wire         c_ready,
+    // second core port (DUAL, r28): completes only together with a port-1 hit
+    input  wire         c2_req,
+    input  wire         c2_we,
+    input  wire [31:0]  c2_addr,
+    input  wire [31:0]  c2_wdata,
+    output wire [31:0]  c2_rdata,
+    output wire         c2_hit,
     // bus master side
     output wire         b_req,
     output wire         b_pf,          // the presented request is a prefetch (r11, coh_bus demand first)
@@ -158,6 +177,14 @@ module l1d_cache #(
     wire          c_hit = (st[c_idx] != ST_I) && (tg[c_idx] == c_tag);
     wire          c_ok  = c_hit && (!c_we || st[c_idx] == ST_M);
 
+    // ---- second port (DUAL, MEM2-10) ----
+    wire [IW-1:0] c2_idx = c2_addr[4+IW-1:4];
+    wire [TW-1:0] c2_tag = c2_addr[AW-1:0] >> (4 + IW);
+    wire [1:0]    c2_off = c2_addr[3:2];
+    wire          c2_ln  = (st[c2_idx] != ST_I) && (tg[c2_idx] == c2_tag);
+    wire          c2_ok  = c2_ln && (!c2_we || st[c2_idx] == ST_M);
+    assign c2_rdata = dat[c2_idx*4 + c2_off];
+
     // ---- snoop lookup ----
     wire [IW-1:0] s_idx   = s_addr[4+IW-1:4];
     wire [TW-1:0] s_tag   = s_addr >> (4 + IW);
@@ -185,6 +212,10 @@ module l1d_cache #(
     // DPF-07: hits go on while the cache's own prefetch owns the bus
     assign c_ready = (c_req && c_ok && (!busy || cur_pf) && !s_block) || fwd;
     assign c_rdata = (fwd && cur_op != OP_UPGR) ? fwd_line[32*c_off +: 32] : dat[c_idx*4 + c_off];
+    // MEM2-10: both plain hits, different words, no snoop on either index
+    wire   s_block2 = s_match && (s_idx == c2_idx);
+    // precondition (the core keeps it, MEM2-10): c2 is never a store of the word port 1 stores (that pair is sequenced)
+    assign c2_hit  = (DUAL > 0) && c2_req && c2_ok && c_req && c_ok && !busy && !s_block && !s_block2;
 
     wire need   = c_req && !c_ok && !busy;
     wire dirty_victim = !c_hit && (st[c_idx] == ST_M);
@@ -304,6 +335,10 @@ module l1d_cache #(
             if (c_ready) begin
                 if (fwd) n_fwd <= n_fwd + 1; else n_hit <= n_hit + 1;
                 if (c_we) dat[c_idx*4 + c_off] <= c_wdata;
+            end
+            if (c2_hit) begin                                  // MEM2-10: port 2 completes with port 1
+                n_hit <= n_hit + (c_ready ? 2 : 1);
+                if (c2_we) dat[c2_idx*4 + c2_off] <= c2_wdata;
             end
             // WBB-02: a snooped RD/RDX took the buffered line (the bus writes it to L2)
             if (s_wbb) begin wv <= 1'b0; n_wbbsnp <= n_wbbsnp + 1; end
