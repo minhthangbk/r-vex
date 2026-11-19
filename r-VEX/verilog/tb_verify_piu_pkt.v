@@ -37,6 +37,7 @@
 //======================================================================
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_verify_piu_pkt;
     reg clk = 0, reset = 1, start = 0;
@@ -73,7 +74,7 @@ module tb_verify_piu_pkt;
     localparam [31:0] NOP = 32'd0;
     localparam [31:0] STOP = {`OP_STOP,25'd0};
 
-    task P; input [11:0] n; input [31:0] s0,s1,s2,s3; begin a.imem[n] = {s3,s2,s1,s0}; end endtask
+    task P; input [11:0] n; input [31:0] s0,s1,s2,s3; begin a.imem[n] = pk8(s3, s2, s1, s0); end endtask
     task chk; input [255:0] nm; input [63:0] got, exp; begin
         if (got === exp) begin pass = pass + 1; $display("  PASS %0s : %0d", nm, got); end
         else begin fail = fail + 1; $display("  FAIL %0s : got %0d (0x%0h) exp %0d (0x%0h)", nm, got, got, exp, exp); end

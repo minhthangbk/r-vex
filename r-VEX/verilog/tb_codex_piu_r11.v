@@ -1,10 +1,11 @@
 // Codex round-11 directed PIU-08/16/17 contract edges.
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_codex_piu_r11;
     reg clk = 0, reset = 1, start = 0;
-    reg [127:0] i_rdata = 0;
+    reg [255:0] i_rdata = 0;
     reg i_ready = 0, d_ready = 1;
     wire done, d_req, d_we, d_word, i_req;
     wire [31:0] cycles, d_addr, d_wdata;
@@ -58,8 +59,8 @@ module tb_codex_piu_r11;
 
         // Two defined multiplies in one committed packet count as two MUL ops
         // but one MULPKT.
-        i_rdata = {32'd0, rr(`MUL_MPYL, 6'd22, 6'd0, 6'd0),
-                   rr(`MUL_MPYLL, 6'd21, 6'd0, 6'd0), 32'd0};
+        i_rdata = pk8(32'd0, rr(`MUL_MPYL, 6'd22, 6'd0, 6'd0),
+                   rr(`MUL_MPYLL, 6'd21, 6'd0, 6'd0), 32'd0);
         @(posedge clk); #1;
         chk("dual MUL MUL16", dut.u_piu.mul16, 1);
         chk("dual MUL MUL32", dut.u_piu.mul32, 1);

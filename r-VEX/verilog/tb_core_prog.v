@@ -19,6 +19,7 @@
 //======================================================================
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_core_prog;
     reg clk=0, reset=1, start=0;
@@ -51,7 +52,7 @@ module tb_core_prog;
     localparam [31:0] NOP = 32'd0;
 
     task P; input [7:0] a; input [31:0] s0,s1,s2,s3; begin
-        dut.imem[a] = {s3,s2,s1,s0}; end
+        dut.imem[a] = pk8(s3, s2, s1, s0); end
     endtask
     task chk; input [127:0] nm; input [31:0] got,exp; begin
         if (got===exp) begin pass=pass+1; $display("  PASS %0s : 0x%08h", nm, got); end

@@ -16,8 +16,10 @@ module tb_codex_piu_edges;
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
         .xnop_c(xnop_c), .fpstall_c(1'b0), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
         .semfail2(1'b0), .misal2(1'b0), .memseq_c(1'b0), .ld2(1'b0), .st2(1'b0),     // r28 mem2.md: slot 2 idle here
-        .op0(op0), .op1(op1), .op2(op2), .op3(op3), .ctrl0(ctrl0),
-        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mul1(mul1), .mul2(mul2), .fp1(1'b0), .fp2(1'b0), .sm1(1'b0), .sm2(1'b0), .ld3(ld3), .st3(st3),
+        // r29 (issue8.md IS8-06): the PIU takes the 8 opcodes as a vector; this bench's multiply slot (op1 / mul1,
+        // the old slot 1) is the first MUL slot 4, op2 stays slot 2
+        .opv({21'd0, op1, op3, op2, 7'd0, op0}), .ctrl0(ctrl0),
+        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mulv({3'b000, mul1}), .fpv(2'b00), .smv(4'b0000), .ld3(ld3), .st3(st3),
         .addr(addr), .rdata(rdata), .we(we), .wdata(wdata),
         .addr2(addr2), .rdata2(rdata2), .we2(1'b0), .wdata2(32'd0));
 

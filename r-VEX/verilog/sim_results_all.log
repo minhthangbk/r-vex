@@ -280,7 +280,7 @@ tb_mul_rand.v:103: $finish called at 12000000 (1ps)
 =================================================
 CORE TEST: 8 passed, 0 failed
 RESULT: CORE TEST PASSED
-tb_core.v:95: $finish called at 145000 (1ps)
+tb_core.v:96: $finish called at 145000 (1ps)
 
 ### Building tb_core_prog ###
 ### Running  tb_core_prog ###
@@ -299,7 +299,7 @@ tb_core.v:95: $finish called at 145000 (1ps)
 =================================================
 CORE PROG #2: 10 passed, 0 failed
 RESULT: CORE PROGRAM #2 PASSED
-tb_core_prog.v:117: $finish called at 125000 (1ps)
+tb_core_prog.v:118: $finish called at 125000 (1ps)
 
 ### Building tb_core_carry ###
 ### Running  tb_core_carry ###
@@ -318,7 +318,7 @@ tb_core_prog.v:117: $finish called at 125000 (1ps)
 =========================================================
 CORE PROG #3: 10 passed, 0 failed
 RESULT: CORE PROGRAM #3 PASSED
-tb_core_carry.v:125: $finish called at 175000 (1ps)
+tb_core_carry.v:126: $finish called at 175000 (1ps)
 
 ### Building tb_codex_stall ###
 ### Running  tb_codex_stall ###
@@ -346,9 +346,13 @@ tb_codex_stall.v:105: $finish called at 146000 (1ps)
   PASS PIU-11 ISTALL : 0
   PASS PIU-11 DSTALL : 0
   PASS PIU-07 SLOT0 : 5
-  PASS PIU-07 SLOT1 : 4
-  PASS PIU-07 SLOT2 : 3
+  PASS PIU-07 SLOT1 : 2
+  PASS PIU-07 SLOT2 : 1
   PASS PIU-07 SLOT3 : 4
+  PASS IS8-06 SLOT4 : 2
+  PASS IS8-06 SLOT5 : 2
+  PASS IS8-06 SLOT6 : 0
+  PASS IS8-06 SLOT7 : 0
   PASS PIU-16 MULPKT : 2
   PASS PIU-17 SEMSTALL : 0
   PASS PIU-03 EN off : 0
@@ -371,9 +375,9 @@ tb_codex_stall.v:105: $finish called at 146000 (1ps)
   PASS PIU-07 NOPPKT final : 1
   PASS PIU-03 EN after STOP : 0
 =========================================================
-PIU TEST: 41 passed, 0 failed
+PIU TEST: 45 passed, 0 failed
 RESULT: PIU PASSED
-tb_piu.v:129: $finish called at 305000 (1ps)
+tb_piu.v:130: $finish called at 305000 (1ps)
 
 ### Building tb_misalign ###
 ### Running  tb_misalign ###
@@ -434,7 +438,7 @@ tb_piu.v:129: $finish called at 305000 (1ps)
 =================================================================
 MISALIGN TEST: 53 passed, 0 failed
 RESULT: MISALIGN PASSED
-tb_misalign.v:129: $finish called at 225000 (1ps)
+tb_misalign.v:130: $finish called at 225000 (1ps)
 
 ### Building tb_piu_sys ###
 ### Running  tb_piu_sys ###
@@ -494,7 +498,7 @@ PASS opcode 12 MUL32 got=0
 PASS opcode 12 ALU got=1
 CODEX PIU EDGES: 50 passed, 0 failed
 RESULT: CODEX PIU EDGES PASSED
-tb_codex_piu_edges.v:96: $finish called at 96000 (1ps)
+tb_codex_piu_edges.v:98: $finish called at 96000 (1ps)
 
 ### Building tb_codex_piu_core ###
 ### Running  tb_codex_piu_core ###
@@ -512,7 +516,7 @@ PASS B STOP cycle included got=2
 PASS C PIU=0 reads dmem got=3735928559
 CODEX PIU CORE: 12 passed, 0 failed
 RESULT: CODEX PIU CORE PASSED
-tb_codex_piu_core.v:88: $finish called at 106000 (1ps)
+tb_codex_piu_core.v:89: $finish called at 106000 (1ps)
 
 ### Building tb_codex_r21_piuaw ###
 ### Running  tb_codex_r21_piuaw ###
@@ -596,7 +600,7 @@ PASS held hw_sem SEMSTALL got=2
 PASS mpleted hw_sem no extra SEMSTALL got=2
 CODEX PIU R11: 12 passed, 0 failed
 RESULT: CODEX PIU R11 PASSED
-tb_codex_piu_r11.v:86: $finish called at 106000 (1ps)
+tb_codex_piu_r11.v:87: $finish called at 106000 (1ps)
 
 ### Building tb_fpu ###
 ### Running  tb_fpu ###
@@ -630,7 +634,7 @@ PASS drain: STOP ends both cores (cap 4 cycles) got=0000000000000003
 PASS drain: no I or D request after STOP got=0000000000000000
 FPU CORE: 22 passed, 0 failed
 RESULT: FPU CORE PASSED
-tb_fpu_core.v:90: $finish called at 116000 (1ps)
+tb_fpu_core.v:91: $finish called at 116000 (1ps)
 
 ### Building tb_r27_fp_hold ###
 ### Running  tb_r27_fp_hold ###
@@ -653,7 +657,7 @@ PASS PIU DSTALL cycles got=2
 PASS drain: no I request after STOP got=0
 PASS drain: no D request after STOP got=0
 RESULT: R27 FP HOLD PASSED (18 checks)
-tb_r27_fp_hold.v:98: $finish called at 216000 (1ps)
+tb_r27_fp_hold.v:99: $finish called at 216000 (1ps)
 
 ### Building tb_mem2 ###
 ### Running  tb_mem2 ###
@@ -710,7 +714,7 @@ PASS MEM2-05 bare cycle law got=10
 PASS MEM2-05 EXT  cycle law got=21
 PASS MEM2-05 bare = EXT packets got=e
 RESULT: MEM2 PASSED (52 checks)
-tb_mem2.v:147: $finish called at 366000 (1ps)
+tb_mem2.v:148: $finish called at 366000 (1ps)
 
 ### Building tb_mem2_sys ###
 ### Running  tb_mem2_sys ###
@@ -785,6 +789,59 @@ tb_mem2_sys: D7 15 dual commits, 1 snoop-held port-2 cycles; D8..D11 3 dual, 3 M
 RESULT: MEM2 SYS PASSED (66 checks)
 tb_mem2_sys.v:178: $finish called at 6525000 (1ps)
 
+### Building tb_issue8 ###
+### Running  tb_issue8 ###
+============= tb_issue8 (issue8.md, r29) =============
+  PASS S1 done : 0x00000001
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000003
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000006
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000009
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x0000000c
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x0000000f
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000012
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000015
+  PASS S1 slot k ALU (r10+k = 3(k+1)) : 0x00000018
+  PASS S2 slot 1 ALU : 0x00000007
+  PASS S2 slot 2 ldw : 0x11223344
+  PASS S2 slot 3 ldw : 0x55667788
+  PASS S2 slot 4 mpyll : 0x00000023
+  PASS S2 slot 5 mpyll : 0x00000019
+  PASS S2 slot 6 mpyll : 0x00000031
+  PASS S2 slot 7 dot2 3*5+4*6 : 0x00000027
+  PASS S3 mpyll in slot 0 writes nothing : 0x00000011
+  PASS S3 dot2 in slot 1 writes nothing : 0x00000011
+  PASS S3 mpyll in slot 2 writes nothing : 0x00000011
+  PASS S3 fadd in slot 3 writes nothing : 0x00000011
+  PASS S3 fadd in slot 6 writes nothing : 0x00000011
+  PASS S4 ldw in slot 4 writes nothing : 0x00000011
+  PASS S4 stw in slot 5 stores nothing : 0x00000000
+  PASS S6 slot 7 wins over slot 1 : 0x00000002
+  PASS S8 brn sees slot 6 compare : 0x00000011
+  PASS S9 brn sees slot 7 last : 0x00000011
+  PASS S9 BR 4 after the packet : 0x00000001
+  PASS S7 ALU next to slot-1 goto : 0x00000001
+  PASS S7 ALU next to slot-1 goto : 0x00000002
+  PASS S7 ALU next to slot-1 goto : 0x00000003
+  PASS S7 ALU next to slot-1 goto : 0x00000004
+  PASS S7 ALU next to slot-1 goto : 0x00000005
+  PASS S7 ALU next to slot-1 goto : 0x00000006
+  PASS S7 ALU next to slot-1 goto : 0x00000007
+  PASS S7 slot-1 goto taken : 0x00000011
+  PASS S11 both halves land : 0xaaaabbbb
+  PASS S10 PIU OPS over 8 slots : 0x00000028
+  PASS S10 PIU PKT : 0x00000009
+  PASS S10 PIU SLOTk : 0x00000006
+  PASS S10 PIU SLOTk : 0x00000005
+  PASS S10 PIU SLOTk : 0x00000005
+  PASS S10 PIU SLOTk : 0x00000005
+  PASS S10 PIU SLOTk : 0x00000005
+  PASS S10 PIU SLOTk : 0x00000004
+  PASS S10 PIU SLOTk : 0x00000005
+  PASS S10 PIU SLOTk : 0x00000005
+tb_issue8: 46 passed, 0 failed
+RESULT: ISSUE8 PASSED
+tb_issue8.v:110: $finish called at 146000 (1ps)
+
 ### Building tb_simd16 ###
 ### Running  tb_simd16 ###
 PASS SM-01..05 unit vectors match simd16ref.py (count of mismatches) got=0
@@ -806,7 +863,7 @@ PASS SM-06 PIU MUL16 counts the 8 slot-1/2 ops got=8
 PASS SM-06 PIU MULPKT counts the 4 packets got=4
 PASS SM-06 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + flop got=b
 RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
-tb_simd16.v:85: $finish called at 20096000 (1ps)
+tb_simd16.v:86: $finish called at 20096000 (1ps)
 
 ### Building tb_verify_piu_pkt ###
 ### Running  tb_verify_piu_pkt ###
@@ -842,7 +899,7 @@ tb_simd16.v:85: $finish called at 20096000 (1ps)
 =====================================================================
 VERIFY PIU PKT: 28 passed, 0 failed
 RESULT: VERIFY PIU PKT PASSED
-tb_verify_piu_pkt.v:155: $finish called at 265000 (1ps)
+tb_verify_piu_pkt.v:156: $finish called at 265000 (1ps)
 
 ### Building tb_codex_cmpbr_oldbr ###
 ### Running  tb_codex_cmpbr_oldbr ###
@@ -1840,6 +1897,7 @@ RESULT: FPU CORE PASSED
 RESULT: R27 FP HOLD PASSED (18 checks)
 RESULT: MEM2 PASSED (52 checks)
 RESULT: MEM2 SYS PASSED (66 checks)
+RESULT: ISSUE8 PASSED
 RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
 RESULT: VERIFY PIU PKT PASSED
 RESULT: CODEX CMPBR OLD-BR PASSED

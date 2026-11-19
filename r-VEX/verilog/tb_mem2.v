@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 // tb_mem2.v (round r28, reviews/contracts/mem2.md MEM2-01..05, research r28 7.1 rows C-01..C-17): two memory ops per
 // packet (slots 2 and 3), the same program on the bare core (EXT_DMEM = 0) and on a core with the external D port
@@ -48,7 +49,7 @@ module tb_mem2;
     function [31:0] mst; input [6:0] op; input [5:0] s, a; input [8:0] off; begin mst = {op, `NO_IMM, s, a, off, 2'b00}; end endfunction
     function [31:0] rr;  input [6:0] op; input [5:0] d, a, bb; begin rr = {op, `NO_IMM, d, a, bb, 5'b0}; end endfunction
     localparam [31:0] NOP = 0;
-    task P; input [11:0] n; input [31:0] s0, s1, s2, s3; begin b.imem[n] = {s3, s2, s1, s0}; e.imem[n] = {s3, s2, s1, s0}; end endtask
+    task P; input [11:0] n; input [31:0] s0, s1, s2, s3; begin b.imem[n] = pk8(s3, s2, s1, s0); e.imem[n] = pk8(s3, s2, s1, s0); end endtask
     task chk; input [511:0] nm; input [63:0] got, exp; begin
         if (got === exp) begin pass = pass + 1; $display("PASS %0s got=%0h", nm, got); end
         else begin fail = fail + 1; $display("FAIL %0s got=%0h expected=%0h", nm, got, exp); end

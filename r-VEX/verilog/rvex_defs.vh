@@ -125,6 +125,7 @@
 `define MEM_STH     7'b0010111
 `define MEM_STB     7'b0011000
 `define MEM_PFT     7'b0011001
+`define MEM_LDD     7'b0011010   // r29 ldd.md LDD-01: two words into two GRs (E2)
 
 // ---- CTRL opcodes ----
 `define CTRL_GOTO   7'b0100001

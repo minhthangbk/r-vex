@@ -15,6 +15,7 @@
 //   0x60 MISALIGN (committed slot-3 accesses not naturally aligned, 2026-11-10 r21, PIU-19, misalign.md MA-03)
 //   0x64 FLOP (committed FADD / FSUB / FMUL ops, one FLOP each, 2026-11-16 r27, PIU-20, fpu.md FP-07)
 //   0x68 FPSTALL (r27, PIU-21)  0x6C MEMSEQ (cycles a packet is held between its two external accesses, r28 mem2.md MEM2-05)
+//   0x70..0x7C SLOT4..SLOT7 (r29 issue8.md IS8-06: non-NOP syllables of the committed packets in slots 4..7)
 // Two window ports (r28, mem2.md MEM2-01): slot 2 and slot 3 read and write the window; two stores of one packet apply
 // in slot order (slot 3 last).
 // Events of a cycle are counted with the EN value held during that cycle;
@@ -40,14 +41,14 @@ module rvex_piu (
     input  wire        misal2,
     input  wire        memseq_c,   // r28 (MEM2-05): held after the first of two external accesses completed
     // committed packet contents
-    input  wire [6:0]  op0, op1, op2, op3,
+    input  wire [55:0] opv,        // r29 (IS8-06): the 8 opcodes, slot k in [7k+6:7k]
     input  wire        ctrl0,      // slot 0 holds a control op
     input  wire        taken0,     // ... and it changes the PC
     input  wire        ctrl1,      // slot 1 holds a control op (mwbr.md MW-05, r24)
     input  wire        taken1,     // ... a slot-1 branch changed the PC (slot 0 did not)
-    input  wire        mul1, mul2, // slot 1/2 op is a multiply
-    input  wire        fp1, fp2,   // slot 1/2 op is an FPU op (PIU-20: not a multiply, not ALU)
-    input  wire        sm1, sm2,   // r28 (simd16.md SM-06): slot 1/2 op is a SIMD16 dual MAC (one MUL16 op each)
+    input  wire [3:0]  mulv,       // r29: slot 4..7 op is in the multiply range (000xxxx, not NOP)
+    input  wire [1:0]  fpv,        // slot 4/5 op is an FPU op (PIU-20: not a multiply, not ALU)
+    input  wire [3:0]  smv,        // r28 (simd16.md SM-06): slot 4..7 op is a SIMD16 dual MAC (one MUL16 op each)
     input  wire        ld3, st3,   // slot 3 op is a load / a store
     input  wire        ld2, st2,   // r28 (MEM2-05): slot 2 op is a load / a store
     // register port (slot 3)
@@ -64,19 +65,29 @@ module rvex_piu (
     reg        en;
     reg [63:0] cyc;
     reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign, flop, fpstall, memseq;
-    reg [31:0] slot [0:3];
+    reg [31:0] slot [0:7];
     integer k;
 
     // 16x16 opcodes are 1..6, 32x16 partial products 7..11 (rvex_defs.vh); the undefined
     // 000xxxx opcodes 12..15 are not multiplies for the PIU (PIU-08, Codex R10) and count as ALU
-    wire md1 = (mul1 && op1 <= 7'd11) || sm1, md2 = (mul2 && op2 <= 7'd11) || sm2;
-    wire m16_1 = (mul1 && op1 <= 7'd6) || sm1, m16_2 = (mul2 && op2 <= 7'd6) || sm2;
-    wire [3:0] nz = {op3 != 7'd0, op2 != 7'd0, op1 != 7'd0, op0 != 7'd0};
-    wire [2:0] n_ops = nz[0] + nz[1] + nz[2] + nz[3];
-    wire [1:0] n_m16 = m16_1 + m16_2;
-    wire [1:0] n_m32 = (md1 && !m16_1) + (md2 && !m16_2);
-    wire [1:0] n_fp  = fp1 + fp2;
-    wire [2:0] n_alu = n_ops - (md1 + md2) - n_fp - ld3 - st3 - ld2 - st2 - ctrl0 - ctrl1;
+    wire [6:0] op [0:7];
+    genvar gs;
+    generate for (gs = 0; gs < 8; gs = gs + 1) begin : g_op
+        assign op[gs] = opv[7*gs+6:7*gs];
+    end endgenerate
+    wire [3:0] md, m16;
+    generate for (gs = 0; gs < 4; gs = gs + 1) begin : g_md
+        assign md[gs]  = (mulv[gs] && op[gs+4] <= 7'd11) || smv[gs];
+        assign m16[gs] = (mulv[gs] && op[gs+4] <= 7'd6) || smv[gs];
+    end endgenerate
+    wire [7:0] nz = {op[7] != 7'd0, op[6] != 7'd0, op[5] != 7'd0, op[4] != 7'd0,
+                     op[3] != 7'd0, op[2] != 7'd0, op[1] != 7'd0, op[0] != 7'd0};
+    wire [3:0] n_ops = nz[0] + nz[1] + nz[2] + nz[3] + nz[4] + nz[5] + nz[6] + nz[7];
+    wire [2:0] n_m16 = m16[0] + m16[1] + m16[2] + m16[3];
+    wire [2:0] n_m32 = (md[0] && !m16[0]) + (md[1] && !m16[1]) + (md[2] && !m16[2]) + (md[3] && !m16[3]);
+    wire [2:0] n_md  = md[0] + md[1] + md[2] + md[3];
+    wire [1:0] n_fp  = fpv[0] + fpv[1];
+    wire [3:0] n_alu = n_ops - n_md - n_fp - ld3 - st3 - ld2 - st2 - ctrl0 - ctrl1;
     wire       cnt = active && en;
     wire       cpk = cnt && commit;
 
@@ -112,6 +123,10 @@ module rvex_piu (
             6'h19: rdata = flop;
             6'h1A: rdata = fpstall;     // PIU-21 (r27): 0xFE68
             6'h1B: rdata = memseq;      // MEM2-05 (r28): 0xFE6C
+            6'h1C: rdata = slot[4];     // IS8-06 (r29): 0xFE70..0xFE7C
+            6'h1D: rdata = slot[5];
+            6'h1E: rdata = slot[6];
+            6'h1F: rdata = slot[7];
             default: rdata = 32'd0;
         endcase
     end
@@ -145,6 +160,10 @@ module rvex_piu (
             6'h19: rdata2 = flop;
             6'h1A: rdata2 = fpstall;     // PIU-21 (r27): 0xFE68
             6'h1B: rdata2 = memseq;      // MEM2-05 (r28): 0xFE6C
+            6'h1C: rdata2 = slot[4];     // IS8-06 (r29): 0xFE70..0xFE7C
+            6'h1D: rdata2 = slot[5];
+            6'h1E: rdata2 = slot[6];
+            6'h1F: rdata2 = slot[7];
             default: rdata2 = 32'd0;
         endcase
     end
@@ -154,7 +173,7 @@ module rvex_piu (
             cyc <= 64'd0; pkt <= 0; ops <= 0; alu <= 0; mul16 <= 0; mul32 <= 0; ld <= 0; st <= 0;
             ctl <= 0; brt <= 0; noppkt <= 0; xnop <= 0; istall <= 0; dstall <= 0; mulpkt <= 0; semstall <= 0; semfail <= 0;
             misalign <= 0; flop <= 0; fpstall <= 0; memseq <= 0;
-            for (k = 0; k < 4; k = k + 1) slot[k] <= 0;
+            for (k = 0; k < 8; k = k + 1) slot[k] <= 0;
         end else begin
             if (cnt) cyc <= cyc + 64'd1;
             if (cnt && xnop_c)   xnop   <= xnop + 1;
@@ -173,12 +192,12 @@ module rvex_piu (
                 st    <= st + st3 + st2;
                 ctl   <= ctl + ctrl0 + ctrl1;
                 brt   <= brt + (taken0 | taken1);
-                if (nz == 4'd0) noppkt <= noppkt + 1;
-                if (md1 || md2) mulpkt <= mulpkt + 1;
+                if (nz == 8'd0) noppkt <= noppkt + 1;
+                if (md != 4'd0) mulpkt <= mulpkt + 1;
                 semfail <= semfail + semfail3 + semfail2;
                 misalign <= misalign + misal3 + misal2;
                 flop  <= flop + n_fp;
-                for (k = 0; k < 4; k = k + 1) if (nz[k]) slot[k] <= slot[k] + 1;
+                for (k = 0; k < 8; k = k + 1) if (nz[k]) slot[k] <= slot[k] + 1;
             end
         end
         if (reset) en <= 1'b1;

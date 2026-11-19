@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 // tb_r27_fp_hold.v (round r27, Codex R54 F7; fpu.md FP-12, piu.md PIU-21): the one-cycle FP hold against the other
 // hold paths of rvex_core with external memories.
@@ -12,7 +13,7 @@
 //   FPSTALL = 4 (P0, P1, P2, P4); after STOP the core drains: no I or D request stays up (rule RR-11), with a cycle cap.
 module tb_r27_fp_hold;
     reg clk = 0, reset = 1, start = 0;
-    reg [127:0] i_rdata;
+    reg [255:0] i_rdata;
     reg i_ready = 1, d_ready = 0;
     wire done, d_req, d_we, d_word, i_req;
     wire [31:0] cycles, d_addr, d_wdata;
@@ -39,13 +40,13 @@ module tb_r27_fp_hold;
 
     always @(*) begin
         case (i_addr)
-          12'd0: i_rdata = {mst(`MEM_STW, 6'd5, 6'd0, 9'd16), NOP, rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), NOP};
-          12'd1: i_rdata = {NOP, NOP, rr(`FPU_FMUL, 6'd7, 6'd4, 6'd5), NOP};
-          12'd2: i_rdata = {NOP, NOP, rr(`FPU_FADD, 6'd9, 6'd4, 6'd4), j12(`CTRL_GOTO, 12'd4)};
-          12'd3: i_rdata = {NOP, NOP, rr(`FPU_FADD, 6'd10, 6'd4, 6'd4), NOP};
-          12'd4: i_rdata = {NOP, NOP, rr(`FPU_FSUB, 6'd8, 6'd6, 6'd7), j12(`CTRL_XNOP, 12'd2)};
-          12'd5: i_rdata = {NOP, NOP, rr(`FPU_FADD, 6'd11, 6'd4, 6'd4), {`OP_STOP, 25'd0}};
-          default: i_rdata = 128'd0;
+          12'd0: i_rdata = pk8(mst(`MEM_STW, 6'd5, 6'd0, 9'd16), NOP, rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), NOP);
+          12'd1: i_rdata = pk8(NOP, NOP, rr(`FPU_FMUL, 6'd7, 6'd4, 6'd5), NOP);
+          12'd2: i_rdata = pk8(NOP, NOP, rr(`FPU_FADD, 6'd9, 6'd4, 6'd4), j12(`CTRL_GOTO, 12'd4));
+          12'd3: i_rdata = pk8(NOP, NOP, rr(`FPU_FADD, 6'd10, 6'd4, 6'd4), NOP);
+          12'd4: i_rdata = pk8(NOP, NOP, rr(`FPU_FSUB, 6'd8, 6'd6, 6'd7), j12(`CTRL_XNOP, 12'd2));
+          12'd5: i_rdata = pk8(NOP, NOP, rr(`FPU_FADD, 6'd11, 6'd4, 6'd4), {`OP_STOP, 25'd0});
+          default: i_rdata = 256'd0;
         endcase
     end
 

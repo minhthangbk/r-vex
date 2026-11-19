@@ -6,10 +6,11 @@
 //   commits; the test drives each FP packet for two cycles (the FPU=0 core runs it twice and writes nothing).
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_fpu_core;
     reg clk = 0, reset = 1, start = 0;
-    reg [127:0] i_rdata = 0;
+    reg [255:0] i_rdata = 0;
     wire done, d_req, d_we, d_word, i_req, done0, d_req0, d_we0, d_word0, i_req0;
     wire [31:0] cycles, d_addr, d_wdata, cycles0, d_addr0, d_wdata0;
     wire [11:0] i_addr, i_addr0;
@@ -37,12 +38,12 @@ module tb_fpu_core;
     initial begin
         repeat (2) @(posedge clk);
         reset = 0; start = 1; #1;
-        i_rdata = 128'd0;                                        // one NOP packet: the core runs from the next edge
+        i_rdata = 256'd0;                                        // one NOP packet: the core runs from the next edge
         @(posedge clk); #1;
         dut.gr[4] = 32'h3FC00000; dut.gr[5] = 32'h40100000;      // 1.5, 2.25
         nofpu.gr[4] = 32'h3FC00000; nofpu.gr[5] = 32'h40100000; nofpu.gr[6] = 32'h12345678; nofpu.gr[7] = 32'h12345678;
         // packet 1: slot 1 fadd r6 = 1.5 + 2.25 = 3.75, slot 2 fmul r7 = 1.5 * 2.25 = 3.375
-        i_rdata = {32'd0, rr(`FPU_FMUL, 6'd7, 6'd4, 6'd5), rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), 32'd0};
+        i_rdata = pk8(32'd0, rr(`FPU_FMUL, 6'd7, 6'd4, 6'd5), rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), 32'd0);
         pc0 = i_addr;
         @(posedge clk); #1;
         chk("FP-12 held cycle writes nothing", dut.gr[6], 32'h0);
@@ -53,18 +54,18 @@ module tb_fpu_core;
         chk("FP-01 slot 1 fadd", dut.gr[6], 32'h40700000);
         chk("FP-01 slot 2 fmul", dut.gr[7], 32'h40580000);
         // packet 2 (latency 1): slot 2 fsub r8 = r6 - r7 = 0.375, slot 1 fsub r9 = r7 - r6 = -0.375
-        i_rdata = {32'd0, rr(`FPU_FSUB, 6'd8, 6'd6, 6'd7), rr(`FPU_FSUB, 6'd9, 6'd7, 6'd6), 32'd0};
+        i_rdata = pk8(32'd0, rr(`FPU_FSUB, 6'd8, 6'd6, 6'd7), rr(`FPU_FSUB, 6'd9, 6'd7, 6'd6), 32'd0);
         @(posedge clk); #1; @(posedge clk); #1;
         chk("FP-05 next packet reads the result, slot 2 fsub", dut.gr[8], 32'h3EC00000);
         chk("FP-01 fsub operand order, slot 1", dut.gr[9], 32'hBEC00000);
         // packet 3: immediate form (the 9-bit field as a pattern: 0x1 = the smallest subnormal) and dst 0
-        i_rdata = {32'd0, rr(`FPU_FADD, 6'd0, 6'd4, 6'd5), ri(`FPU_FMUL, 6'd10, 6'd4, 9'd1), 32'd0};
+        i_rdata = pk8(32'd0, rr(`FPU_FADD, 6'd0, 6'd4, 6'd5), ri(`FPU_FMUL, 6'd10, 6'd4, 9'd1), 32'd0);
         @(posedge clk); #1; @(posedge clk); #1;
         chk("FP-01 immediate operand pattern", dut.gr[10], 32'h00000002);   // 1.5 * 2^-149 = 1.5 ulp -> 2 (ties to even)
         chk("FP-01 dst 0 writes nothing", dut.gr[0], 32'h0);
         // packet 4: FPU codes in slot 0 and slot 3 (undefined there, FP-08: as before r27), code 15 in slot 1 (ALU)
         dut.gr[11] = 32'h12345678; dut.gr[12] = 32'h12345678; dut.gr[13] = 32'h12345678;
-        i_rdata = {rr(`FPU_FADD, 6'd12, 6'd4, 6'd5), 32'd0, rr(7'd15, 6'd13, 6'd4, 6'd5), rr(`FPU_FADD, 6'd11, 6'd4, 6'd5)};
+        i_rdata = pk8(rr(`FPU_FADD, 6'd12, 6'd4, 6'd5), 32'd0, rr(7'd15, 6'd13, 6'd4, 6'd5), rr(`FPU_FADD, 6'd11, 6'd4, 6'd5));
         @(posedge clk); #1;
         chk("FP-08 FADD code in slot 0 writes nothing (as before r27)", dut.gr[11], 32'h12345678);
         chk("FP-08 / BUG-320 FADD code in slot 3 writes nothing", dut.gr[12], 32'h12345678);

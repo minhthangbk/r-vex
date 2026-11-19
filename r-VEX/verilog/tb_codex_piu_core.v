@@ -1,6 +1,7 @@
 // Codex round-10 PIU core-level edge cases, from reviews/contracts/piu.md.
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_codex_piu_core;
     reg clk = 0, reset = 1, start = 0;
@@ -23,11 +24,11 @@ module tb_codex_piu_core;
     localparam [31:0] STOP = {`OP_STOP,25'd0};
 
     task PA; input [11:0] n; input [31:0] s0,s1,s2,s3;
-        begin a.imem[n] = {s3,s2,s1,s0}; end endtask
+        begin a.imem[n] = pk8(s3, s2, s1, s0); end endtask
     task PB; input [11:0] n; input [31:0] s0,s1,s2,s3;
-        begin b.imem[n] = {s3,s2,s1,s0}; end endtask
+        begin b.imem[n] = pk8(s3, s2, s1, s0); end endtask
     task PC; input [11:0] n; input [31:0] s0,s1,s2,s3;
-        begin c.imem[n] = {s3,s2,s1,s0}; end endtask
+        begin c.imem[n] = pk8(s3, s2, s1, s0); end endtask
     task chk; input [255:0] name; input [63:0] got, expected;
         begin
             if (got === expected) begin pass = pass + 1; $display("PASS %0s got=%0d", name, got); end

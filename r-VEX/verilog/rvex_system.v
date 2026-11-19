@@ -95,7 +95,7 @@ module rvex_system #(
         assign d_ready = mmio_sub ? 1'b1 : mmio ? sem_ready[g] : c_ready;
         assign d_rdata = mmio_sub ? 32'hFFFF_FFFF : mmio ? {31'd0, sem_rbit[g]} : c_rdata;
         wire [PC_W-1:0] i_addr;
-        wire [127:0] i_rdata;
+        wire [255:0] i_rdata;   // r29 IS8-02: 256-bit packets
         rvex_core #(.PC_W(PC_W), .DMEM_AW(AW), .EXT_DMEM(1), .EXT_IMEM(1), .DUAL_D(L1D_DUAL)) core (
             .clk(clk), .reset(reset), .start(start[g]), .done(done[g]), .cycles(cyc[g]),
             .d_req(d_req), .d_we(d_we), .d_addr(d_addr), .d_wdata(d_wdata), .d_word(d_word),

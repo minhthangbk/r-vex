@@ -1,7 +1,7 @@
 //======================================================================
 // r-VEX | L1 instruction cache (one per core)
 //----------------------------------------------------------------------
-// Direct-mapped, 4 packets (4 x 128 bits) per line, read-only. A miss
+// Direct-mapped, 4 packets (4 x 256 bits since r29, issue8.md IS8-02) per line, read-only. A miss
 // refills the line from this core's program memory `rom` after FILL_LAT
 // cycles (the next level for instructions; code is never written, so it
 // needs no coherence). Hits are combinational, so a hit keeps the core's
@@ -29,7 +29,7 @@ module l1i_cache #(
     input  wire            reset,
     input  wire            i_req,
     input  wire [PC_W-1:0] i_addr,      // packet address (PC)
-    output wire [127:0]    i_rdata,
+    output wire [255:0]    i_rdata,
     output wire            i_ready
 );
     localparam IW = (SETS > 1) ? $clog2(SETS) : 1;
@@ -46,10 +46,10 @@ module l1i_cache #(
         $display("FATAL %m: SETS=%0d lines is more than the %0d-packet program memory", SETS, 1 << PC_W); $finish;
     end
 
-    reg [127:0]  rom [0:(1<<PC_W)-1];
+    reg [255:0]  rom [0:(1<<PC_W)-1];
     reg          vld [0:SETS-1];
     reg [TW-1:0] tg  [0:SETS-1];
-    reg [127:0]  dat [0:SETS*4-1];
+    reg [255:0]  dat [0:SETS*4-1];
     reg [31:0]   n_hit, n_miss;
     reg          filling;
     reg [15:0]   cnt;
@@ -62,7 +62,7 @@ module l1i_cache #(
     localparam LW = PC_W - 2;
     reg            pf_v, pf_busy;
     reg  [LW-1:0]  pf_ln;
-    reg  [127:0]   pf_dat [0:3];
+    reg  [255:0]   pf_dat [0:3];
     reg  [15:0]    pf_cnt;
     reg  [31:0]    n_pf, n_pfhit, n_pfabort;
     wire [LW-1:0]  ln    = i_addr[PC_W-1:2];

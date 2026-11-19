@@ -74,11 +74,14 @@ run tb_fpu_core          "$CORE"                               tb_fpu_core.v
 run tb_r27_fp_hold       "$CORE"                               tb_r27_fp_hold.v
 run tb_mem2             "$CORE"                               tb_mem2.v
 run tb_mem2_sys         "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_mem2_sys.v
+# r29 B2 (reviews/contracts/ldd.md LDD-01..07): 64-bit loads on the bare, EXT and dual-port cores
+run tb_ldd               "$CORE"                               tb_ldd.v
 # r28 (reviews/contracts/simd16.md): SIMD16 unit vectors from the reference model, then through the core
 SMREF=${SMREF:-../../../toolchain/sim/simd16ref.py}   # the gate runs a copy of this directory and passes the path
 [ -f "$SMREF" ] || { echo "FAIL tb_simd16: reference model $SMREF not found (set SMREF)"; exit 2; }
 python3 "$SMREF" vectors 20000 11 > simd16_vec.txt || { echo "FAIL tb_simd16: simd16ref.py vectors failed"; exit 2; }
 wc -l < simd16_vec.txt > simd16_vec.n   # final verify r28 F9 (BUG-355): the bench must read every line
+run tb_issue8           "$CORE"                               tb_issue8.v
 run tb_simd16           "$CORE"                               tb_simd16.v
 rm -f simd16_vec.txt simd16_vec.n
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v

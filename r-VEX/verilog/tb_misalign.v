@@ -11,6 +11,7 @@
 //======================================================================
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_misalign;
     integer pass = 0, fail = 0, k;
@@ -38,7 +39,7 @@ module tb_misalign;
         mst = {op,`NO_IMM,s,b,off,2'b00}; end endfunction
     localparam [31:0] NOP = 32'd0;
     localparam [31:0] STOP = {`OP_STOP,25'd0};
-    task P; input [11:0] a; input [31:0] s0,s1,s2,s3; begin dut.imem[a] = {s3,s2,s1,s0}; end endtask
+    task P; input [11:0] a; input [31:0] s0,s1,s2,s3; begin dut.imem[a] = pk8(s3, s2, s1, s0); end endtask
 
     initial begin
         $display("============= misaligned access test (misalign.md) =============");

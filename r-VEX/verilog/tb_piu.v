@@ -10,6 +10,7 @@
 //======================================================================
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 module tb_piu;
     reg clk = 0, reset = 1, start = 0;
@@ -35,7 +36,7 @@ module tb_piu;
     localparam [31:0] STOP = {`OP_STOP,25'd0};
 
     task P; input [11:0] a; input [31:0] s0,s1,s2,s3; begin
-        dut.imem[a] = {s3,s2,s1,s0}; end endtask
+        dut.imem[a] = pk8(s3, s2, s1, s0); end endtask
     task chk; input [255:0] nm; input [63:0] got, exp; begin
         if (got === exp) begin pass = pass + 1; $display("  PASS %0s : %0d", nm, got); end
         else begin fail = fail + 1; $display("  FAIL %0s : got %0d (0x%0h) exp %0d (0x%0h)", nm, got, got, exp, exp); end
@@ -149,9 +150,15 @@ module tb_piu;
         chk("PIU-11 ISTALL",  dut.u_piu.istall, 0);
         chk("PIU-11 DSTALL",  dut.u_piu.dstall, 0);
         chk("PIU-07 SLOT0",   dut.u_piu.slot[0], 5);
-        chk("PIU-07 SLOT1",   dut.u_piu.slot[1], 4);
-        chk("PIU-07 SLOT2",   dut.u_piu.slot[2], 3);
+        // r29 (issue8.md IS8-01, triage T1 of the r29 review): pk8 moves the program's 2 slot-1 and 2 slot-2 multiplies
+        // to the MUL slots 4 and 5, so SLOT1 / SLOT2 lose them and SLOT4 / SLOT5 count them (OPS unchanged)
+        chk("PIU-07 SLOT1",   dut.u_piu.slot[1], 2);
+        chk("PIU-07 SLOT2",   dut.u_piu.slot[2], 1);
         chk("PIU-07 SLOT3",   dut.u_piu.slot[3], 4);
+        chk("IS8-06 SLOT4",   dut.u_piu.slot[4], 2);
+        chk("IS8-06 SLOT5",   dut.u_piu.slot[5], 2);
+        chk("IS8-06 SLOT6",   dut.u_piu.slot[6], 0);
+        chk("IS8-06 SLOT7",   dut.u_piu.slot[7], 0);
         chk("PIU-16 MULPKT",  dut.u_piu.mulpkt, 2);
         chk("PIU-17 SEMSTALL", dut.u_piu.semstall, 0);
         chk("PIU-03 EN off",  dut.u_piu.en, 0);

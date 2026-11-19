@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
+`include "slot8.vh"
 
 // tb_simd16.v (round r28, reviews/contracts/simd16.md SM-01..06)
 //   part 1: the simd16 unit against simd16ref.py vectors (simd16_vec.txt: corners of every op + random)
@@ -23,7 +24,7 @@ module tb_simd16;
     function [31:0] rr; input [6:0] o; input [5:0] d, x, y; begin rr = {o, `NO_IMM, d, x, y, 5'b0}; end endfunction
     function [31:0] ri; input [6:0] o; input [5:0] d, x; input [8:0] im; begin ri = {o, `SHORT_IMM, d, x, im, 2'b00}; end endfunction
     localparam [31:0] NOP = 0;
-    task P; input [11:0] k; input [31:0] s0, s1, s2, s3; begin c.imem[k] = {s3, s2, s1, s0}; end endtask
+    task P; input [11:0] k; input [31:0] s0, s1, s2, s3; begin c.imem[k] = pk8(s3, s2, s1, s0); end endtask
     integer cyc = 0, bad = 0;
 
     initial begin
