@@ -105,6 +105,8 @@
 `define FPU_FADD    7'b0001100
 `define FPU_FSUB    7'b0001101
 `define FPU_FMUL    7'b0001110
+// ---- SIMD16 4-lane MAC (round r30 B2, reviews/contracts/simd4.md SQ-01; slots 4-7; sub-op syl[4:2]) ----
+`define SQ_SIMD4    7'b0001111
 // ---- SIMD16 dual-MAC opcodes (round r28, reviews/contracts/simd16.md SM-07; slots 1-2 like MUL) ----
 // free codes outside every range decoder: 0x69..0x6F above ANDL, 0x40 below ADD
 `define SM_DOT2     7'b1101001
@@ -126,6 +128,7 @@
 `define MEM_STB     7'b0011000
 `define MEM_PFT     7'b0011001
 `define MEM_LDD     7'b0011010   // r29 ldd.md LDD-01: two words into two GRs (E2)
+`define MEM_LDQ     7'b0011011   // r30 ldq.md LQ-01: four words into two GR pairs (P2)
 
 // ---- CTRL opcodes ----
 `define CTRL_GOTO   7'b0100001
