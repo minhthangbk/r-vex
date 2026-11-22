@@ -4,7 +4,8 @@
 //   S1 FP-18 scalar fmadd / fmsub / fmrsub (rD accumulate) in slot 4; S2 FP-18 fused: (1 + 2^-23)^2 - (1 + 2^-22) is
 //   2^-46 fused, 0 unfused; S3 FP-20 every pair op (lane-wise and cross-lane) in slots 4-7; S4 FP-21 a reader of the
 //   pending high half rD + 1 is interlocked; S5 FP-19 pair rD = 0, an odd pair field, undefined sub-ops (imm type 11
-//   sub 0, imm type 10) and the family in slots 0-3 write nothing; S6 FP-17 a higher slot's write of rD + 1 wins;
+//   sub 0, imm type 10) and the family in slots 0-3 write nothing (Codex batch 3 F2: odd rD / rA / rB, slots 0 / 1 / 2 / 3
+//   each a row); S6 FP-17 a higher slot's write of rD + 1 wins;
 //   S7 FP-18 a chain of fmadd on one accumulator (RAW on rD) is interlocked; S8 PIU FLOP weights and FPOP (FP-22, PIU-22)
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
@@ -85,6 +86,21 @@ module tb_fpx_core;
         chk("FP-19 imm type 11 sub-op 0 writes nothing", dut.gr[46], 32'h33333333);
         chk("FP-19 imm type 10 writes nothing (B2 dot8 later)", dut.gr[48], 32'h55555555);
         chk("FP-19 the family in slot 2 writes nothing", dut.gr[49], 32'h66666666);
+        // Codex batch 3 F2 (r32): one row per FP-19 guard: odd rD (slot 4), odd rB (slot 6), the family in slots 0 / 1 / 3
+        dut.gr[53] = 32'h77777777; dut.gr[36] = 32'h88888888; dut.gr[37] = 32'h99999999;
+        dut.gr[54] = 32'hAAAAAAAA; dut.gr[55] = 32'hAAAAAAA1; dut.gr[56] = 32'hBBBBBBBB; dut.gr[57] = 32'hBBBBBBB1;
+        dut.gr[58] = 32'hCCCCCCCC; dut.gr[59] = 32'hCCCCCCC1;
+        i_rdata = pk(32'd0, fx(2'b01, 3'd3, 6'd36, 6'd2, 6'd5), 32'd0, fx(2'b01, 3'd3, 6'd53, 6'd2, 6'd4),
+                     fx(2'b01, 3'd3, 6'd58, 6'd2, 6'd4), 32'd0, fx(2'b01, 3'd3, 6'd56, 6'd2, 6'd4), fx(2'b01, 3'd3, 6'd54, 6'd2, 6'd4)); cyc; nop2;
+        chk("FP-19 an odd rD field writes nothing (slot 4)", dut.gr[53], 32'h77777777);
+        chk("FP-19 an odd rB field writes nothing (low, slot 6)", dut.gr[36], 32'h88888888);
+        chk("FP-19 an odd rB field writes nothing (high)", dut.gr[37], 32'h99999999);
+        chk("FP-19 the family in slot 0 writes nothing (low)", dut.gr[54], 32'hAAAAAAAA);
+        chk("FP-19 the family in slot 0 writes nothing (high)", dut.gr[55], 32'hAAAAAAA1);
+        chk("FP-19 the family in slot 1 writes nothing (low)", dut.gr[56], 32'hBBBBBBBB);
+        chk("FP-19 the family in slot 1 writes nothing (high)", dut.gr[57], 32'hBBBBBBB1);
+        chk("FP-19 the family in slot 3 writes nothing (low)", dut.gr[58], 32'hCCCCCCCC);
+        chk("FP-19 the family in slot 3 writes nothing (high)", dut.gr[59], 32'hCCCCCCC1);
         i_rdata = pk(ri(`ALU_ADD, 6'd51, 6'd0, 9'd7), 32'd0, 32'd0, fx(2'b01, 3'd3, 6'd50, 6'd2, 6'd4), 32'd0, 32'd0, 32'd0, 32'd0); cyc; nop2;
         chk("FP-17 / FP-21 slot 7 ALU write of rD + 1 wins", dut.gr[51], 32'd7);
         chk("FP-21 the low lane of that pair is written", dut.gr[50], 32'h40600000);
