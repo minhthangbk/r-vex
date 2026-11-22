@@ -458,6 +458,11 @@ module rvex_core #(
     wire        val5 = is_fpu(op5) ? 1'b0 : is_sq(op5) ? sq_ok(op5, imt5, r1a5, r2a5) : is_simd(op5) ? sm5_v : is_mul(op5) ? mul5_v : alu5_v;
     wire        val6 = is_fpu(op6) ? 1'b0 : is_sq(op6) ? sq_ok(op6, imt6, r1a6, r2a6) : is_simd(op6) ? sm6_v : is_mul(op6) ? mul6_v : alu6_v;
     wire        val7 = is_fpu(op7) ? 1'b0 : is_sq(op7) ? sq_ok(op7, imt7, r1a7, r2a7) : is_simd(op7) ? sm7_v : is_mul(op7) ? mul7_v : alu7_v;
+    // r31 FP-17 (Codex batch 2 F6): a GR write of slot k at this packet's commit (non-FP: val is 0 for FP ops); a pending
+    // FP write of a lower slot to the same GR is dropped, so the highest slot of the packet wins (IS8-03)
+    wire        gw5 = dst5 != 6'd0 && ((op5 != `OP_NOP && val5) || is_addcg_divs(op5));
+    wire        gw6 = dst6 != 6'd0 && ((op6 != `OP_NOP && val6) || is_addcg_divs(op6));
+    wire        gw7 = dst7 != 6'd0 && ((op7 != `OP_NOP && val7) || is_addcg_divs(op7));
 
     // ---- external data port / miss stall ----
     assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
@@ -660,9 +665,9 @@ module rvex_core #(
 
                     //--------------- PC / stall update ---------------
                     // FP-13: this packet's FP ops write at the next edge (FP-M14 mutant point: their destinations)
-                    fpp_v4 <= is_fpu(op4) && dst4 != 6'd0; fpp_d4 <= dst4;
-                    fpp_v5 <= is_fpu(op5) && dst5 != 6'd0; fpp_d5 <= dst5;
-                    fpp_v6 <= is_fpu(op6) && dst6 != 6'd0; fpp_d6 <= dst6;
+                    fpp_v4 <= is_fpu(op4) && dst4 != 6'd0 && !(gw5 && dst5 == dst4) && !(gw6 && dst6 == dst4) && !(gw7 && dst7 == dst4); fpp_d4 <= dst4;
+                    fpp_v5 <= is_fpu(op5) && dst5 != 6'd0 && !(gw6 && dst6 == dst5) && !(gw7 && dst7 == dst5); fpp_d5 <= dst5;
+                    fpp_v6 <= is_fpu(op6) && dst6 != 6'd0 && !(gw7 && dst7 == dst6); fpp_d6 <= dst6;
                     fpp_v7 <= is_fpu(op7) && dst7 != 6'd0; fpp_d7 <= dst7;
                     seq_k <= 3'd0;                          // MEM2-04: the next packet starts with its first access
                     if (slot0_is_ctrl && c_xnop) begin

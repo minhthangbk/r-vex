@@ -8,7 +8,9 @@
 //   T4 FP-14 pair: the FP op writes r25, the next packet's dot4 reads the pair r24:r25: held, the dot4 reads it
 //   T5 an independent packet after an FP op is not held
 //   T6 FP-08: FPU codes in slots 1-2 write nothing; T7 FP-14: a store after an FP op is presented once with the result;
-//   T8 FP-14: a reader that waits on the fetch is not an FP interlock
+//   T8 FP-14: a reader that waits on the fetch is not an FP interlock; T9 FP-17: same-packet FP / ALU WAW, highest slot
+//   wins; T10 MEM base under a D-stall; T11 ldd second destination; T12 ldq pair destination; T13 return reads LR;
+//   T14 an FP op before STOP; drain with TIMEOUT and idle ports
 // Mutants (mutate.py): FP-M12 (T6), FP-M15 (T7), FP-M16 (T8), FP-M13 (stage register loads on the held cycle only: T1 results wrong), FP-M14 (no
 // interlock: T2 / T4 read the old values), FP-M16 (pair halves not matched: T4), FP-M17 (FPSTALL not counted).
 `timescale 1ns/1ps
@@ -22,26 +24,36 @@ module tb_fpu_pipe;
     wire [11:0] i_addr;
     integer pass = 0, fail = 0;
     reg [11:0] pc0;
-    reg i_ready = 1;
+    reg i_ready = 1, d_ready = 1;
+    integer nld = 0, bad_addr = 0, k;
+    reg [31:0] want_addr = 32'hFFFFFFFF;
+    always @(posedge clk) if (d_req && !d_we) begin nld = nld + 1; if (d_addr !== want_addr) bad_addr = bad_addr + 1; end
     integer nst = 0;
     reg [31:0] st_data = 0;
     always @(posedge clk) if (d_req && d_we) begin nst = nst + 1; st_data = d_wdata; end   // T7: every store presented
 
     rvex_core #(.EXT_IMEM(1), .EXT_DMEM(1)) dut(
         .clk(clk), .reset(reset), .start(start), .done(done), .cycles(cycles),
-        .d_req(d_req), .d_we(d_we), .d_addr(d_addr), .d_wdata(d_wdata), .d_word(d_word), .d_rdata(32'd0),
-        .d_ready(1'b1), .stall_cycles(), .i_req(i_req), .i_addr(i_addr), .i_rdata(i_rdata), .i_ready(i_ready),
+        .d_req(d_req), .d_we(d_we), .d_addr(d_addr), .d_wdata(d_wdata), .d_word(d_word), .d_rdata(32'h11111111),
+        .d_ready(d_ready), .stall_cycles(), .i_req(i_req), .i_addr(i_addr), .i_rdata(i_rdata), .i_ready(i_ready),
         .istall_cycles());
     always #5 clk = ~clk;
 
     function [31:0] rr; input [6:0] op; input [5:0] d, a, b; begin rr = {op, 2'b00, d, a, b, 5'b0}; end endfunction
     function [31:0] ri; input [6:0] op; input [5:0] d, a; input [8:0] im; begin ri = {op, 2'b01, d, a, im, 2'b00}; end endfunction
+    function [31:0] ldw; input [5:0] d, b; begin ldw = {`MEM_LDW, `NO_IMM, d, b, 9'd0, 2'b0}; end endfunction
+    function [31:0] ldd; input [5:0] d1, d2, b; begin ldd = {`MEM_LDD, 2'b00, d1, b, d2, 3'b000, 2'b0}; end endfunction
+    function [31:0] ldq; input [5:0] pa, pb, a; begin ldq = {`MEM_LDQ, 2'b00, pa[5:1], 1'b0, a, pb[5:1], 1'b0, 3'b000, 2'b00}; end endfunction
     function [255:0] pk; input [31:0] s7, s6, s5, s4, s3, s2, s1, s0; begin pk = {s7, s6, s5, s4, s3, s2, s1, s0}; end endfunction
     task chk; input [511:0] name; input [63:0] got, expected; begin
         if (got === expected) begin pass = pass + 1; $display("PASS %0s got=%08x", name, got); end
         else begin fail = fail + 1; $display("FAIL %0s got=%08x expected=%08x", name, got, expected); end
     end endtask
     task cyc; begin @(posedge clk); #1; end endtask
+    reg [11:0] pcw;
+    task hold; integer w; begin pcw = i_addr; w = 0;   // keep driving the packet until the PC moves (max 12 cycles)
+        while (i_addr == pcw && w < 12) begin cyc; w = w + 1; end
+        if (i_addr == pcw) $display("TIMEOUT tb_fpu_pipe: the packet at %0d never committed", pcw); end endtask
 
     initial begin
         repeat (2) @(posedge clk);
@@ -109,10 +121,58 @@ module tb_fpu_pipe;
         i_rdata = 256'd0; cyc;
         chk("FP-14 the fetch-stalled reader then reads the FP result", dut.gr[21], 32'h3F400000);
         chk("FP-14 no FP interlock after the fetch stall", dut.u_piu.fpstall, pc0);
+        // T9 FP-17 (Codex batch 2 F6): one packet writes a GR from an FP op and an ALU op: the highest slot wins
+        i_rdata = pk(ri(`ALU_ADD, 6'd22, 6'd0, 9'd7), 32'd0, 32'd0, rr(`FPU_FADD, 6'd22, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        i_rdata = 256'd0; cyc; cyc;
+        chk("FP-17 FP slot 4 and ALU slot 7 write r22: slot 7 wins", dut.gr[22], 32'd7);
+        i_rdata = pk(rr(`FPU_FADD, 6'd23, 6'd4, 6'd5), 32'd0, 32'd0, ri(`ALU_ADD, 6'd23, 6'd0, 9'd7), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        i_rdata = 256'd0; cyc; cyc;
+        chk("FP-17 ALU slot 4 and FP slot 7 write r23: slot 7 (FP) wins", dut.gr[23], 32'h40700000);
+        // T10 FP-14 MEM base under a D-stall: fadd r46 = 3.75, then ldw r47 = 0[r46] (slot 2) with d_ready low 2
+        // cycles: one interlock cycle, every presented address is the FP result
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd46, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall; nld = 0; bad_addr = 0; want_addr = 32'h40700000;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldw(6'd47, 6'd46), 32'd0, 32'd0); d_ready = 0; cyc; cyc; cyc;
+        d_ready = 1; cyc; i_rdata = 256'd0; cyc;
+        chk("FP-14 MEM base reader under a D-stall: one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("FP-14 MEM base reader: every load address is the FP result", bad_addr, 0);
+        chk("FP-14 MEM base reader: the load was presented", nld > 0, 1'b1);
+        chk("FP-14 MEM base reader: the load completes", dut.gr[47], 32'h11111111);
+        want_addr = 32'd0;
+        // T11 FP-14 ldd second destination: fsub r45 = 0.75, then ldd r44, r45 = 0[r0]: held, the later write wins
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FSUB, 6'd45, 6'd5, 6'd4), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldd(6'd44, 6'd45, 6'd0), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (4) cyc;
+        chk("FP-14 ldd second destination: one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("FP-14 ldd second destination: the load's write is last", dut.gr[45], 32'h11111111);
+        // T12 FP-14 ldq destination pair: fmul r41 = 3.375, then ldq r40:r41, r42:r43 = 0[r0]: held (pair match)
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FMUL, 6'd41, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldq(6'd40, 6'd42, 6'd0), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (6) cyc;
+        chk("FP-14 ldq pair destination (odd half): one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("FP-14 ldq pair destination: the load's write is last", dut.gr[41], 32'h11111111);
+        // T13 FP-14 slot-0 control reads LR: fadd r63 = 3.75 (0x40700000), then return: held, PC = r63[11:0] = 0
+        dut.gr[1] = 32'h00008000;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd63, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        dut.gr[63] = 32'h00000123;   // the value a return without the interlock would jump to (the FP write lands next)
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, 32'd0, 32'd0, {`CTRL_RETURN, 2'b00, 6'd0, 12'd0, 5'd0}); cyc; cyc;
+        chk("FP-14 return reads the FP result in LR: one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("FP-14 return jumps to the FP result", i_addr, 12'h000);
+        // T14 FP-13 an FP op right before STOP still writes its result
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};
-        repeat (4) begin if (!done) @(posedge clk); end
+        k = 0;
+        while (!done && k < 20) begin @(posedge clk); k = k + 1; end
         #1;
+        if (!done) $display("TIMEOUT tb_fpu_pipe: no STOP after 20 cycles");
         chk("drain: STOP ends the core", done, 1'b1);
+        chk("FP-13 the FP op before STOP wrote its result", dut.gr[48], 32'h40700000);
+        repeat (2) @(posedge clk); #1;
+        chk("drain: no fetch after STOP", i_req, 1'b0);
+        chk("drain: no data access after STOP", d_req, 1'b0);
         $display("FPU PIPE: %0d passed, %0d failed", pass, fail);
         $display("RESULT: FPU PIPE %s", fail == 0 ? "PASSED" : "FAILED");
         $finish;

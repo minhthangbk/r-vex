@@ -90,6 +90,9 @@ module tb_mem2;
         while (!(done_b && done_e) && cyc_b < 300) begin @(posedge clk); cyc_b = cyc_b + 1; end
         #1;
         chk("both cores end by STOP within the cap", done_b && done_e, 1);
+        if (!(done_b && done_e)) $display("TIMEOUT tb_mem2: no STOP after 300 cycles");   // RR-11 (Codex r31 batch 2 F5)
+        repeat (2) @(posedge clk); #1;
+        chk("drain: the external D port is idle after STOP", d_req, 0);
         // ---- values: the same on both cores ----
         chk("C-01 bare ld+st: load reads the old word", b.gr[10], 32'h11223344);
         chk("C-01 EXT  ld+st: load reads the old word", e.gr[10], 32'h11223344);

@@ -72,6 +72,7 @@ module tb_issue8;
         dut.gr[57] = 32'h0000_0011;
         @(negedge clk); start = 1; @(negedge clk); start = 0;
         for (k = 0; k < 200 && !done; k = k + 1) @(posedge clk);
+        if (!done) $display("TIMEOUT tb_issue8: no STOP after 200 cycles");   // RR-11 (Codex r31 batch 2 F5)
         #1;
         $display("============= tb_issue8 (issue8.md, r29) =============");
         chk("S1 done", {31'd0, done}, 1);
