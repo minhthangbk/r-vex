@@ -69,9 +69,15 @@ F32REF=${F32REF:-../../../toolchain/sim/f32ref.py}   # the gate runs a copy of t
 python3 "$F32REF" vectors 200000 7 > fpu_vec.txt || { echo "FAIL tb_fpu: f32ref.py vectors failed"; exit 2; }
 wc -l < fpu_vec.txt > fpu_vec.n   # final verify r28 F9 sweep (BUG-355): the bench must read every line
 run tb_fpu               "rvex_defs.vh fpu.v"                   tb_fpu.v
-rm -f fpu_vec.txt fpu_vec.n
+# r32 (fpu.md FP-18 / FP-20): the fused lane against f32ref fma vectors and the lane identities on the scalar vectors
+python3 "$F32REF" fmavectors 40000 13 > fma_vec.txt || { echo "FAIL tb_fma: f32ref.py fmavectors failed"; exit 2; }
+wc -l < fma_vec.txt > fma_vec.n
+python3 "$F32REF" vectors 20000 17 > fpu_vec.txt   # a smaller scalar set for the lane identities (tb_fma reads it whole)
+run tb_fma               "fma32.v"                              tb_fma.v
+rm -f fpu_vec.txt fpu_vec.n fma_vec.txt fma_vec.n
 run tb_fpu_core          "$CORE"                               tb_fpu_core.v
 run tb_fpu_pipe          "$CORE"                               tb_fpu_pipe.v   # r31 fpu.md FP-13 / FP-14: pipelined FPUs, interlock
+run tb_fpx_core          "$CORE"                               tb_fpx_core.v   # r32 fpu.md FP-17..FP-22: FMA, pair, cross-lane
 run tb_r27_fp_hold       "$CORE"                               tb_r27_fp_hold.v
 run tb_mem2             "$CORE"                               tb_mem2.v
 run tb_mem2_sys         "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_mem2_sys.v

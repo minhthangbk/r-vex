@@ -492,13 +492,15 @@ PASS PIU-21 FPSTALL readback at 0x68 got=3927
 PASS MEM2-05 MEMSEQ readback at 0x6C got=2668
 PASS 2-01 slot-2 port MEMSEQ readback got=2668
 PASS EM2-01 slot-2 port FLOP readback got=3856
+PASS PIU-22 FPOP readback at 0x80 got=3968
+PASS PIU-22 slot-2 port FPOP readback got=3968
 PASS opcode 12 OPS got=1
 PASS opcode 12 MUL16 got=0
 PASS opcode 12 MUL32 got=0
 PASS opcode 12 ALU got=1
-CODEX PIU EDGES: 50 passed, 0 failed
+CODEX PIU EDGES: 47 passed, 0 failed
 RESULT: CODEX PIU EDGES PASSED
-tb_codex_piu_edges.v:98: $finish called at 96000 (1ps)
+tb_codex_piu_edges.v:104: $finish called at 86000 (1ps)
 
 ### Building tb_codex_piu_core ###
 ### Running  tb_codex_piu_core ###
@@ -608,6 +610,12 @@ FPU PASS vectors 202700 mismatches 0
 RESULT: FPU PASSED
 tb_fpu.v:46: $finish called at 1216201 (1s)
 
+### Building tb_fma ###
+### Running  tb_fma ###
+FMA PASS vectors 53500 lane 22700 mismatches 0
+RESULT: FMA PASSED
+tb_fma.v:47: $finish called at 76200 (1s)
+
 ### Building tb_fpu_core ###
 ### Running  tb_fpu_core ###
 PASS FP-13 the result is not written at the commit got=0000000000000000
@@ -655,10 +663,78 @@ PASS FP-14 the independent add got=000000003fc00000
 PASS FP-13 slot 7 fsub of T5 got=000000003f400000
 PASS PIU-20 FLOP counts the FP ops of slots 4-7 got=0000000000000008
 PASS PIU-21 FPSTALL counts the two interlocked readers and the pair got=0000000000000003
+PASS FP-08 an FPU code in slot 1 writes nothing got=0000000012345678
+PASS FP-08 an FPU code in slot 2 writes nothing got=000000009abcdef0
+PASS FP-14 the store after an FP op is presented once got=0000000000000001
+PASS FP-14 the store writes the FP result got=0000000040700000
+PASS FP-14 a fetch-stalled reader is not counted as an FP interlock got=0000000000000004
+PASS FP-14 the fetch-stalled reader then reads the FP result got=000000003f400000
+PASS FP-14 no FP interlock after the fetch stall got=0000000000000004
+PASS FP-17 FP slot 4 and ALU slot 7 write r22: slot 7 wins got=0000000000000007
+PASS FP-17 ALU slot 4 and FP slot 7 write r23: slot 7 (FP) wins got=0000000040700000
+PASS FP-14 MEM base reader under a D-stall: one interlock cycle got=0000000000000005
+PASS FP-14 MEM base reader: every load address is the FP result got=0000000000000000
+PASS FP-14 MEM base reader: the load was presented got=0000000000000001
+PASS FP-14 MEM base reader: the load completes got=0000000011111111
+PASS FP-14 ldd second destination: one interlock cycle got=0000000000000006
+PASS FP-14 ldd second destination: the load's write is last got=0000000011111111
+PASS FP-14 ldq pair destination (odd half): one interlock cycle got=0000000000000007
+PASS FP-14 ldq pair destination: the load's write is last got=0000000011111111
+PASS FP-14 return reads the FP result in LR: one interlock cycle got=0000000000000008
+PASS FP-14 return jumps to the FP result got=0000000000000000
+PASS FP-17 BRIMM compare in slot 7 keeps the slot-4 FP write got=0000000040700000
+PASS FP-17 an mtb in slot 6 does not drop the slot-5 FP write got=0000000040700000
 PASS drain: STOP ends the core got=0000000000000001
-FPU PIPE: 18 passed, 0 failed
+PASS FP-13 the FP op before STOP wrote its result got=0000000040700000
+PASS drain: no fetch after STOP got=0000000000000000
+PASS drain: no data access after STOP got=0000000000000000
+FPU PIPE: 42 passed, 0 failed
 RESULT: FPU PIPE PASSED
-tb_fpu_pipe.v:88: $finish called at 176000 (1ps)
+tb_fpu_pipe.v:189: $finish called at 716000 (1ps)
+
+### Building tb_fpx_core ###
+### Running  tb_fpx_core ###
+PASS FP-18 not written at the commit got=000000003e800000
+PASS FP-18 fmadd rD + rA*rB (slot 4) got=0000000040500000
+PASS FP-18 fmsub rD - rA*rB (slot 5) got=00000000c0300000
+PASS FP-18 fmrsub rA*rB - rD (slot 7) got=0000000040300000
+PASS FP-18 fused: one rounding (unfused gives 00000000) got=0000000028800000
+PASS FP-20 fadd2 low lane (slot 4) got=0000000040600000
+PASS FP-20 fadd2 high lane got=000000003fc00000
+PASS FP-20 fsub2 low lane (slot 5) got=00000000bf000000
+PASS FP-20 fsub2 high lane got=0000000040400000
+PASS FP-20 fmul2 low lane (slot 6) got=0000000040400000
+PASS FP-20 fmul2 high lane got=00000000bfd80000
+PASS FP-20 fmadd2 low lane (slot 7) got=0000000040500000
+PASS FP-20 fmadd2 high lane got=0000000041050000
+PASS FP-20 fmsub2 low lane (slot 4) got=00000000c0300000
+PASS FP-20 fmsub2 high lane got=00000000413b0000
+PASS FP-20 fmul2x low lane (slot 5) got=00000000bf900000
+PASS FP-20 fmul2x high lane got=0000000040900000
+PASS FP-20 fhsa2 low lane (slot 6) got=00000000bf400000
+PASS FP-20 fhsa2 high lane got=000000003fa00000
+PASS FP-20 faddsub2 low lane (slot 7) got=00000000bf000000
+PASS FP-20 faddsub2 high lane got=000000003fc00000
+PASS FP-21 a reader of the pending high half is interlocked one cycle got=0000000000000001
+PASS FP-21 the reader sees the high lane got=000000003fc00000
+PASS FP-19 pair rD = 0 writes nothing (SP kept) got=0000000000008000
+PASS FP-19 an odd pair field writes nothing (low) got=0000000011111111
+PASS FP-19 an odd pair field writes nothing (high) got=0000000022222222
+PASS FP-19 imm type 11 sub-op 0 writes nothing got=0000000033333333
+PASS FP-19 imm type 10 writes nothing (B2 dot8 later) got=0000000055555555
+PASS FP-19 the family in slot 2 writes nothing got=0000000066666666
+PASS FP-17 / FP-21 slot 7 ALU write of rD + 1 wins got=0000000000000007
+PASS FP-21 the low lane of that pair is written got=0000000040600000
+PASS FP-18 fmadd chain on rD: the second op reads the first result got=0000000040c80000
+PASS FP-14 the chain is interlocked one cycle got=0000000000000002
+PASS PIU FLOP weights (1 scalar FPU, 2 FMA / pair, 4 fmadd2 / fmsub2) got=0000000000000026
+PASS PIU-22 FPOP counts the FP ops got=0000000000000011
+PASS drain: STOP ends the core got=0000000000000001
+PASS drain: no fetch after STOP got=0000000000000000
+PASS drain: no data access after STOP got=0000000000000000
+FPX CORE: 38 passed, 0 failed
+RESULT: FPX CORE PASSED
+tb_fpx_core.v:108: $finish called at 336000 (1ps)
 
 ### Building tb_r27_fp_hold ###
 ### Running  tb_r27_fp_hold ###
@@ -686,6 +762,7 @@ tb_r27_fp_hold.v:102: $finish called at 176000 (1ps)
 ### Building tb_mem2 ###
 ### Running  tb_mem2 ###
 PASS both cores end by STOP within the cap got=1
+PASS drain: the external D port is idle after STOP got=0
 PASS C-01 bare ld+st: load reads the old word got=11223344
 PASS C-01 EXT  ld+st: load reads the old word got=11223344
 PASS C-01 bare store applied got=55667788
@@ -737,8 +814,8 @@ PASS MEM2-05 EXT  FPSTALL = 0 (FP-13: no hold; STOP follows C-17) got=0
 PASS MEM2-05 bare cycle law got=f
 PASS MEM2-05 EXT  cycle law got=20
 PASS MEM2-05 bare = EXT packets got=e
-RESULT: MEM2 PASSED (52 checks)
-tb_mem2.v:149: $finish called at 356000 (1ps)
+RESULT: MEM2 PASSED (53 checks)
+tb_mem2.v:152: $finish called at 376000 (1ps)
 
 ### Building tb_mem2_sys ###
 ### Running  tb_mem2_sys ###
@@ -1499,7 +1576,7 @@ tb_ldq.v:312: $finish called at 9316000 (1ps)
   PASS S10 PIU SLOTk : 0x00000005
 tb_issue8: 46 passed, 0 failed
 RESULT: ISSUE8 PASSED
-tb_issue8.v:110: $finish called at 146000 (1ps)
+tb_issue8.v:111: $finish called at 146000 (1ps)
 
 ### Building tb_simd16 ###
 ### Running  tb_simd16 ###
@@ -1542,7 +1619,7 @@ PASS SQ-06 pair partner r3 written in the packet is read old got=5f
 PASS SQ-06 pair partner r5 written in the packet is read old got=5f
 PASS SQ-06 the packet's ALU writes land (r3) got=0
 PASS SQ-05 odd A field writes nothing got=cafe
-PASS SQ-05 imm type 01 writes nothing got=cafe
+PASS SQ-05 imm type 11 sub-op 0 writes nothing (r32 FP-19) got=cafe
 PASS SQ-05 odd B field writes nothing got=cafe
 PASS SQ-05 slot 0 writes nothing got=cafe
 PASS SQ-05 slot 3 writes nothing got=cafe
@@ -1551,7 +1628,7 @@ PASS SQ-05 slot 2 writes nothing got=cafe
 PASS SQ-02 slot 6 valid next to undefined forms got=7
 PASS SQ-07 PIU MUL16 counts the 11 defined 4-lane ops got=b
 PASS SQ-07 PIU MULPKT counts the 4 packets got=4
-PASS SQ-07 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + flop got=14
+PASS 2 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop (r32 PIU-22) got=14
 PASS SQ-05 SIMD4 = 0: the op writes nothing got=beef
 RESULT: SIMD4 PASSED (27 checks, 20000 vectors)
 tb_simd4.v:109: $finish called at 20166000 (1ps)
@@ -2584,10 +2661,12 @@ RESULT: CODEX R42 MISAL SYS PASSED
 RESULT: CODEX PIU DUALCTRL PASSED
 RESULT: CODEX PIU R11 PASSED
 RESULT: FPU PASSED
+RESULT: FMA PASSED
 RESULT: FPU CORE PASSED
 RESULT: FPU PIPE PASSED
+RESULT: FPX CORE PASSED
 RESULT: R27 FP HOLD PASSED (18 checks)
-RESULT: MEM2 PASSED (52 checks)
+RESULT: MEM2 PASSED (53 checks)
 RESULT: MEM2 SYS PASSED (66 checks)
 RESULT: LDD PASSED (97 checks)
 RESULT: LDQ PASSED (528 checks)

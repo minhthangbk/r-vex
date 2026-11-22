@@ -13,13 +13,14 @@ module tb_codex_piu_edges;
     reg  [7:2]  addr2 = 6'h00;   // r28 (MEM2-01): the slot-2 window read port
     integer pass = 0, fail = 0, a;
 
+    // r32 fpu.md FP-22: the fpw port (FLOP weights) tied to 0 here
     rvex_piu dut(.clk(clk), .reset(reset), .active(active), .commit(commit),
         .xnop_c(xnop_c), .fpstall_c(1'b0), .istall_c(istall_c), .dstall_c(dstall_c), .semstall_c(1'b0), .semfail3(1'b0), .misal3(1'b0),
         .semfail2(1'b0), .misal2(1'b0), .memseq_c(1'b0), .ld2(1'b0), .st2(1'b0),     // r28 mem2.md: slot 2 idle here
         // r29 (issue8.md IS8-06): the PIU takes the 8 opcodes as a vector; this bench's multiply slot (op1 / mul1,
         // the old slot 1) is the first MUL slot 4, op2 stays slot 2
         .opv({21'd0, op1, op3, op2, 7'd0, op0}), .ctrl0(ctrl0),
-        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mulv({3'b000, mul1}), .fpv(2'b00), .smv(4'b0000), .ld3(ld3), .st3(st3),
+        .taken0(taken0), .ctrl1(1'b0), .taken1(1'b0), .mulv({3'b000, mul1}), .fpv(4'b0000), .fpw(12'd0), .smv(4'b0000), .ld3(ld3), .st3(st3),
         .addr(addr), .rdata(rdata), .we(we), .wdata(wdata),
         .addr2(addr2), .rdata2(rdata2), .we2(1'b0), .wdata2(32'd0));
 
@@ -72,9 +73,14 @@ module tb_codex_piu_edges;
         chk("MEM2-01 slot-2 port MEMSEQ readback", rdata2, 32'h0000_0A6C);
         addr2 = 6'h19; #1; chk("MEM2-01 slot-2 port FLOP readback", rdata2, 32'h0000_0F10);
         addr2 = 6'h00;
-        dut.flop = 0; dut.fpstall = 0; dut.memseq = 0;
+        // r32 piu.md PIU-22: FPOP readback at 0x80 on both ports
+        dut.fpop = 32'h0000_0F80;
+        addr = 6'h20; addr2 = 6'h20; #1; chk("PIU-22 FPOP readback at 0x80", rdata, 32'h0000_0F80);
+        chk("PIU-22 slot-2 port FPOP readback", rdata2, 32'h0000_0F80);
+        addr2 = 6'h00;
+        dut.flop = 0; dut.fpstall = 0; dut.memseq = 0; dut.fpop = 0;
         // PIU-02: every unimplemented word offset, not just 0x54, reads zero.
-        for (a = 6'h1C; a <= 6'h3f; a = a + 1) begin   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19), 0x64 FLOP / 0x68 FPSTALL r27 (PIU-20/21), 0x6C MEMSEQ r28 (MEM2-05): first hole 0x70
+        for (a = 6'h21; a <= 6'h3f; a = a + 1) begin   // r32: 0x70..0x7C SLOT4..7 (IS8-06), 0x80 FPOP (PIU-22) are registers   // 0x54 MULPKT, 0x58 SEMSTALL after R10 (PIU-16/17), 0x5C SEMFAIL r10 (PIU-18), 0x60 MISALIGN r21 (PIU-19), 0x64 FLOP / 0x68 FPSTALL r27 (PIU-20/21), 0x6C MEMSEQ r28 (MEM2-05): first hole 0x70
             addr = a[5:0]; #1;
             if (rdata !== 0) begin
                 fail = fail + 1;

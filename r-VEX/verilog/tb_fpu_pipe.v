@@ -10,7 +10,8 @@
 //   T6 FP-08: FPU codes in slots 1-2 write nothing; T7 FP-14: a store after an FP op is presented once with the result;
 //   T8 FP-14: a reader that waits on the fetch is not an FP interlock; T9 FP-17: same-packet FP / ALU WAW, highest slot
 //   wins; T10 MEM base under a D-stall; T11 ldd second destination; T12 ldq pair destination; T13 return reads LR;
-//   T14 an FP op before STOP; drain with TIMEOUT and idle ports
+//   T14 an FP op before STOP; T15 BR-only writes (BRIMM compare, mtb) keep a pending FP write (BUG-399); drain with
+//   TIMEOUT and idle ports
 // Mutants (mutate.py): FP-M12 (T6), FP-M15 (T7), FP-M16 (T8), FP-M13 (stage register loads on the held cycle only: T1 results wrong), FP-M14 (no
 // interlock: T2 / T4 read the old values), FP-M16 (pair halves not matched: T4), FP-M17 (FPSTALL not counted).
 `timescale 1ns/1ps
@@ -161,6 +162,16 @@ module tb_fpu_pipe;
         i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, 32'd0, 32'd0, {`CTRL_RETURN, 2'b00, 6'd0, 12'd0, 5'd0}); cyc; cyc;
         chk("FP-14 return reads the FP result in LR: one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
         chk("FP-14 return jumps to the FP result", i_addr, 12'h000);
+        // T15 FP-17 (r32 BUG-399): a BR-only write of a higher slot never drops a pending FP write, though its dst field
+        // [22:17] equals the FP destination: a BRIMM compare (BR index syl[19:17] = 1, dst field 9) and an mtb (dst field 10)
+        dut.gr[9] = 32'd0; dut.gr[10] = 32'd0;
+        i_rdata = pk({`ALU_CMPLT, 2'b11, 6'd9, 6'd4, 9'd7, 2'b00}, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5),
+                     32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        i_rdata = pk(32'd0, {`ALU_MTB, 2'b00, 6'd10, 6'd4, 6'd0, 3'd2, 2'b00}, rr(`FPU_FADD, 6'd10, 6'd4, 6'd5), 32'd0,
+                     32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        i_rdata = 256'd0; repeat (3) cyc;
+        chk("FP-17 BRIMM compare in slot 7 keeps the slot-4 FP write", dut.gr[9], 32'h40700000);
+        chk("FP-17 an mtb in slot 6 does not drop the slot-5 FP write", dut.gr[10], 32'h40700000);
         // T14 FP-13 an FP op right before STOP still writes its result
         i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};

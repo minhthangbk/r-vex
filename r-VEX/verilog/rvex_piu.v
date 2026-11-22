@@ -48,6 +48,7 @@ module rvex_piu (
     input  wire        taken1,     // ... a slot-1 branch changed the PC (slot 0 did not)
     input  wire [3:0]  mulv,       // r29: slot 4..7 op is in the multiply range (000xxxx, not NOP)
     input  wire [3:0]  fpv,        // slot 4..7 op is an FPU op (PIU-20: not a multiply, not ALU; r31 FP-13: 4 FPUs)
+    input  wire [11:0] fpw,        // r32 fpu.md FP-22: FLOPs of the slot 4..7 op (3 bits each: 1, 2 or 4)
     input  wire [3:0]  smv,        // r28 (simd16.md SM-06): slot 4..7 op is a SIMD16 dual MAC (one MUL16 op each)
     input  wire        ld3, st3,   // slot 3 op is a load / a store
     input  wire        ld2, st2,   // r28 (MEM2-05): slot 2 op is a load / a store
@@ -64,7 +65,7 @@ module rvex_piu (
 );
     reg        en;
     reg [63:0] cyc;
-    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign, flop, fpstall, memseq;
+    reg [31:0] pkt, ops, alu, mul16, mul32, ld, st, ctl, brt, noppkt, xnop, istall, dstall, mulpkt, semstall, semfail, misalign, flop, fpstall, memseq, fpop;   // r32 PIU-22 FPOP (0xFE80)
     reg [31:0] slot [0:7];
     integer k;
 
@@ -87,6 +88,7 @@ module rvex_piu (
     wire [2:0] n_m32 = (md[0] && !m16[0]) + (md[1] && !m16[1]) + (md[2] && !m16[2]) + (md[3] && !m16[3]);
     wire [2:0] n_md  = md[0] + md[1] + md[2] + md[3];
     wire [2:0] n_fp  = fpv[0] + fpv[1] + fpv[2] + fpv[3];
+    wire [4:0] n_flop = fpw[2:0] + fpw[5:3] + fpw[8:6] + fpw[11:9];   // r32 FP-22
     wire [3:0] n_alu = n_ops - n_md - n_fp - ld3 - st3 - ld2 - st2 - ctrl0 - ctrl1;
     wire       cnt = active && en;
     wire       cpk = cnt && commit;
@@ -127,6 +129,7 @@ module rvex_piu (
             6'h1D: rdata = slot[5];
             6'h1E: rdata = slot[6];
             6'h1F: rdata = slot[7];
+            6'h20: rdata = fpop;        // r32 PIU-22: 0xFE80
             default: rdata = 32'd0;
         endcase
     end
@@ -164,6 +167,7 @@ module rvex_piu (
             6'h1D: rdata2 = slot[5];
             6'h1E: rdata2 = slot[6];
             6'h1F: rdata2 = slot[7];
+            6'h20: rdata2 = fpop;       // r32 PIU-22
             default: rdata2 = 32'd0;
         endcase
     end
@@ -172,7 +176,7 @@ module rvex_piu (
         if (reset || (we && addr == 6'h00 && wdata[1]) || (we2 && addr2 == 6'h00 && wdata2[1])) begin
             cyc <= 64'd0; pkt <= 0; ops <= 0; alu <= 0; mul16 <= 0; mul32 <= 0; ld <= 0; st <= 0;
             ctl <= 0; brt <= 0; noppkt <= 0; xnop <= 0; istall <= 0; dstall <= 0; mulpkt <= 0; semstall <= 0; semfail <= 0;
-            misalign <= 0; flop <= 0; fpstall <= 0; memseq <= 0;
+            misalign <= 0; flop <= 0; fpstall <= 0; memseq <= 0; fpop <= 0;
             for (k = 0; k < 8; k = k + 1) slot[k] <= 0;
         end else begin
             if (cnt) cyc <= cyc + 64'd1;
@@ -196,7 +200,8 @@ module rvex_piu (
                 if (md != 4'd0) mulpkt <= mulpkt + 1;
                 semfail <= semfail + semfail3 + semfail2;
                 misalign <= misalign + misal3 + misal2;
-                flop  <= flop + n_fp;
+                flop  <= flop + n_flop;    // r32 FP-22: weighted (PIU-20 was the op count)
+                fpop  <= fpop + n_fp;      // r32 PIU-22: FP ops (the OPS identity PIU-12 uses FPOP)
                 for (k = 0; k < 8; k = k + 1) if (nz[k]) slot[k] <= slot[k] + 1;
             end
         end

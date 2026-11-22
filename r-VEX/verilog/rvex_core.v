@@ -39,6 +39,8 @@
 `include "rvex_defs.vh"
 `include "rvex_piu.v"
 `include "fpu.v"
+`include "fma32.v"   // r32 fpu.md FP-18 (fused lanes)
+`include "fpx.v"     // r32 FP family of 0x0F
 `include "simd16.v"
 `include "simd4.v"
 
@@ -146,6 +148,17 @@ module rvex_core #(
     function sq_ok; input [6:0] op; input [1:0] imt; input [5:0] ra, rb; begin
         sq_ok = is_sq(op) && (imt == `NO_IMM) && !ra[0] && !rb[0]; end
     endfunction
+    // r32 fpu.md FP-18..FP-22: the FP family of opcode 0x0F (imm type 01 / 11, sub-op syl[4:2]; fpx.v); defined sub-ops
+    // only, pair forms with even rD / rA / rB; an undefined form writes nothing (FP-08)
+    function is_fpx; input [6:0] op; input [1:0] imt; begin
+        is_fpx = FPU && (op == `SQ_SIMD4) && (imt == 2'b01 || imt == 2'b11); end endfunction
+    function fpx_pair; input [1:0] imt; input [2:0] sub; begin
+        fpx_pair = !(imt == 2'b01 && sub <= 3'd2); end endfunction
+    function fpx_ok; input [6:0] op; input [1:0] imt; input [2:0] sub; input [5:0] rd, ra, rb; begin
+        fpx_ok = is_fpx(op, imt) && (imt == 2'b01 || (sub >= 3'd4 && sub <= 3'd6)) &&
+                 (!fpx_pair(imt, sub) || (!rd[0] && !ra[0] && !rb[0])); end endfunction
+    function [2:0] fpx_w; input [1:0] imt; input [2:0] sub; begin   // FP-22 FLOPs per op
+        fpx_w = (imt == 2'b01 && sub >= 3'd6) ? 3'd4 : 3'd2; end endfunction
     function is_addcg_divs; input [6:0] op; begin
         is_addcg_divs = (op[6:3]==`ALU_ADDCG4) || (op[6:3]==`ALU_DIVS4); end
     endfunction
@@ -228,7 +241,12 @@ module rvex_core #(
     simd4 u_sq5(.sub(syl5[4:2]),.a0(gr_r1_5),.a1(gr[{r1a5[5:1],1'b1}]),.b0(gr_r2_5),.b1(gr[{r2a5[5:1],1'b1}]),.acc(gr[dst5]),.result(sq5_r));
     simd4 u_sq6(.sub(syl6[4:2]),.a0(gr_r1_6),.a1(gr[{r1a6[5:1],1'b1}]),.b0(gr_r2_6),.b1(gr[{r2a6[5:1],1'b1}]),.acc(gr[dst6]),.result(sq6_r));
     simd4 u_sq7(.sub(syl7[4:2]),.a0(gr_r1_7),.a1(gr[{r1a7[5:1],1'b1}]),.b0(gr_r2_7),.b1(gr[{r2a7[5:1],1'b1}]),.acc(gr[dst7]),.result(sq7_r));
+    wire        fx4 = fpx_ok(op4, imt4, syl4[4:2], dst4, r1a4, r2a4), fx5 = fpx_ok(op5, imt5, syl5[4:2], dst5, r1a5, r2a5),
+                fx6 = fpx_ok(op6, imt6, syl6[4:2], dst6, r1a6, r2a6), fx7 = fpx_ok(op7, imt7, syl7[4:2], dst7, r1a7, r2a7);
+    wire        fxp4 = fx4 && fpx_pair(imt4, syl4[4:2]), fxp5 = fx5 && fpx_pair(imt5, syl5[4:2]),
+                fxp6 = fx6 && fpx_pair(imt6, syl6[4:2]), fxp7 = fx7 && fpx_pair(imt7, syl7[4:2]);
     wire [31:0] fpu4_r, fpu5_r, fpu6_r, fpu7_r; wire fpu4_v, fpu5_v, fpu6_v, fpu7_v;
+    wire [31:0] fpx4_l, fpx4_h, fpx5_l, fpx5_h, fpx6_l, fpx6_h, fpx7_l, fpx7_h;   // r32 FP-18..FP-21 (fpx.v)
     wire        fp_wait;                 // FP-14 interlock, below
     wire        commit;                  // the packet commits this cycle (assigned below)
     generate if (FPU) begin : g_fpu
@@ -238,7 +256,18 @@ module rvex_core #(
         fpu #(.PIPE(1)) u_fpu5(.clk(clk),.ld(commit),.fpuop(op5),.src1(gr_r1_5),.src2(a2_5),.result(fpu5_r),.out_valid(fpu5_v));
         fpu #(.PIPE(1)) u_fpu6(.clk(clk),.ld(commit),.fpuop(op6),.src1(gr_r1_6),.src2(a2_6),.result(fpu6_r),.out_valid(fpu6_v));
         fpu #(.PIPE(1)) u_fpu7(.clk(clk),.ld(commit),.fpuop(op7),.src1(gr_r1_7),.src2(a2_7),.result(fpu7_r),.out_valid(fpu7_v));
+        // r32: the FP family of 0x0F; stage 1 loads only for its own ops (the lanes are evaluated only then)
+        fpx u_fpx4(.clk(clk),.ld(commit && fx4),.imt(imt4),.sub(syl4[4:2]),.a0(gr_r1_4),.a1(gr[{r1a4[5:1],1'b1}]),
+                   .b0(gr_r2_4),.b1(gr[{r2a4[5:1],1'b1}]),.d0(gr[dst4]),.d1(gr[{dst4[5:1],1'b1}]),.lo(fpx4_l),.hi(fpx4_h));
+        fpx u_fpx5(.clk(clk),.ld(commit && fx5),.imt(imt5),.sub(syl5[4:2]),.a0(gr_r1_5),.a1(gr[{r1a5[5:1],1'b1}]),
+                   .b0(gr_r2_5),.b1(gr[{r2a5[5:1],1'b1}]),.d0(gr[dst5]),.d1(gr[{dst5[5:1],1'b1}]),.lo(fpx5_l),.hi(fpx5_h));
+        fpx u_fpx6(.clk(clk),.ld(commit && fx6),.imt(imt6),.sub(syl6[4:2]),.a0(gr_r1_6),.a1(gr[{r1a6[5:1],1'b1}]),
+                   .b0(gr_r2_6),.b1(gr[{r2a6[5:1],1'b1}]),.d0(gr[dst6]),.d1(gr[{dst6[5:1],1'b1}]),.lo(fpx6_l),.hi(fpx6_h));
+        fpx u_fpx7(.clk(clk),.ld(commit && fx7),.imt(imt7),.sub(syl7[4:2]),.a0(gr_r1_7),.a1(gr[{r1a7[5:1],1'b1}]),
+                   .b0(gr_r2_7),.b1(gr[{r2a7[5:1],1'b1}]),.d0(gr[dst7]),.d1(gr[{dst7[5:1],1'b1}]),.lo(fpx7_l),.hi(fpx7_h));
     end else begin : g_nofpu
+        assign fpx4_l = 32'd0; assign fpx4_h = 32'd0; assign fpx5_l = 32'd0; assign fpx5_h = 32'd0;
+        assign fpx6_l = 32'd0; assign fpx6_h = 32'd0; assign fpx7_l = 32'd0; assign fpx7_h = 32'd0;
         assign fpu4_r = 32'd0; assign fpu5_r = 32'd0; assign fpu4_v = 1'b0; assign fpu5_v = 1'b0;
         assign fpu6_r = 32'd0; assign fpu7_r = 32'd0; assign fpu6_v = 1'b0; assign fpu7_v = 1'b0;
     end endgenerate
@@ -460,9 +489,9 @@ module rvex_core #(
     wire        val7 = is_fpu(op7) ? 1'b0 : is_sq(op7) ? sq_ok(op7, imt7, r1a7, r2a7) : is_simd(op7) ? sm7_v : is_mul(op7) ? mul7_v : alu7_v;
     // r31 FP-17 (Codex batch 2 F6): a GR write of slot k at this packet's commit (non-FP: val is 0 for FP ops); a pending
     // FP write of a lower slot to the same GR is dropped, so the highest slot of the packet wins (IS8-03)
-    wire        gw5 = dst5 != 6'd0 && ((op5 != `OP_NOP && val5) || is_addcg_divs(op5));
-    wire        gw6 = dst6 != 6'd0 && ((op6 != `OP_NOP && val6) || is_addcg_divs(op6));
-    wire        gw7 = dst7 != 6'd0 && ((op7 != `OP_NOP && val7) || is_addcg_divs(op7));
+    wire        gw5 = dst5 != 6'd0 && op5 != `ALU_MTB && !bi5 && ((op5 != `OP_NOP && val5) || is_addcg_divs(op5));
+    wire        gw6 = dst6 != 6'd0 && op6 != `ALU_MTB && !bi6 && ((op6 != `OP_NOP && val6) || is_addcg_divs(op6));
+    wire        gw7 = dst7 != 6'd0 && op7 != `ALU_MTB && !bi7 && ((op7 != `OP_NOP && val7) || is_addcg_divs(op7));
 
     // ---- external data port / miss stall ----
     assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
@@ -475,6 +504,8 @@ module rvex_core #(
     // any of its register fields names a pending destination (slots 2-7 by pair: ldq and the 4-lane ops read / write
     // register pairs; a slot-0 control op also reads / writes GR1 (SP) and GR63 (LR)); FPSTALL counts that cycle
     reg        fpp_v4, fpp_v5, fpp_v6, fpp_v7;
+    reg        fpp_h4, fpp_h5, fpp_h6, fpp_h7;   // r32 FP-21: the high half rD + 1 of a pending pair result
+    reg        fpp_x4, fpp_x5, fpp_x6, fpp_x7;   // r32: the pending result is the FP family's (fpx.v)
     reg  [5:0] fpp_d4, fpp_d5, fpp_d6, fpp_d7;
     // pair: the slot may hold a pair op (ldq in slots 2-3, a 4-lane op in slots 4-7); a field matches by pair only when
     // the syllable is that op (r31: other ops by exact field, so an FP result in r9 does not hold a reader of r8)
@@ -488,7 +519,10 @@ module rvex_core #(
                fhit(d, pk[159:128], 1'b1) || fhit(d, pk[191:160], 1'b1) || fhit(d, pk[223:192], 1'b1) ||
                fhit(d, pk[255:224], 1'b1) || (c0 && (d == 6'd1 || d == 6'd63)); end endfunction
     wire   fp_dep  = (fpp_v4 && fdep(fpp_d4, packet, slot0_is_ctrl)) || (fpp_v5 && fdep(fpp_d5, packet, slot0_is_ctrl)) ||
-                     (fpp_v6 && fdep(fpp_d6, packet, slot0_is_ctrl)) || (fpp_v7 && fdep(fpp_d7, packet, slot0_is_ctrl));
+                     (fpp_v6 && fdep(fpp_d6, packet, slot0_is_ctrl)) || (fpp_v7 && fdep(fpp_d7, packet, slot0_is_ctrl)) ||
+                     // r32 FP-21: a pending high half (rD + 1 of a pair result) interlocks its readers too
+                     (fpp_h4 && fdep({fpp_d4[5:1], 1'b1}, packet, slot0_is_ctrl)) || (fpp_h5 && fdep({fpp_d5[5:1], 1'b1}, packet, slot0_is_ctrl)) ||
+                     (fpp_h6 && fdep({fpp_d6[5:1], 1'b1}, packet, slot0_is_ctrl)) || (fpp_h7 && fdep({fpp_d7[5:1], 1'b1}, packet, slot0_is_ctrl));
     assign fp_wait = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && fp_dep;
     wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && !fp_wait;
     wire mem_acc = mem3_acc;
@@ -519,7 +553,10 @@ module rvex_core #(
         .ctrl1(slot1_is_ctrl), .taken1(c1_taken),   // mwbr.md MW-05
         // r29 (IS8-06): the MUL / SIMD slots 4-7 and the FPU slots 4-5
         .mulv({is_mul(op7), is_mul(op6), is_mul(op5), is_mul(op4)}),
-        .fpv({is_fpu(op7), is_fpu(op6), is_fpu(op5), is_fpu(op4)}),   // PIU-20 FLOP (fpu.md FP-07; r31 FP-13: slots 4-7)
+        .fpv({is_fpu(op7) || fx7, is_fpu(op6) || fx6, is_fpu(op5) || fx5, is_fpu(op4) || fx4}),   // PIU-20 / r32 PIU-22 FPOP
+        // r32 fpu.md FP-22: FLOPs per slot (1 scalar FPU op, 2 FMA / pair op, 4 fmadd2 / fmsub2)
+        .fpw({fx7 ? fpx_w(imt7, syl7[4:2]) : {2'b0, is_fpu(op7)}, fx6 ? fpx_w(imt6, syl6[4:2]) : {2'b0, is_fpu(op6)},
+              fx5 ? fpx_w(imt5, syl5[4:2]) : {2'b0, is_fpu(op5)}, fx4 ? fpx_w(imt4, syl4[4:2]) : {2'b0, is_fpu(op4)}}),
         // simd16.md SM-06: MUL16 and MULPKT (r28); simd4.md SQ-07 (r30): a 4-lane op is one MUL16 op, one with an odd
         // pair field or imm type != 00 is undefined (writes nothing) and counts as an ALU op like codes 12..15
         .smv({is_simd(op7) || sq_ok(op7, imt7, r1a7, r2a7), is_simd(op6) || sq_ok(op6, imt6, r1a6, r2a6),
@@ -543,6 +580,8 @@ module rvex_core #(
             pc <= {PC_W{1'b0}}; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
             stall_cycles <= 32'd0; istall_cycles <= 32'd0; seq_k <= 3'd0;
             fpp_v4 <= 1'b0; fpp_v5 <= 1'b0; fpp_v6 <= 1'b0; fpp_v7 <= 1'b0;
+            fpp_h4 <= 1'b0; fpp_h5 <= 1'b0; fpp_h6 <= 1'b0; fpp_h7 <= 1'b0;
+            fpp_x4 <= 1'b0; fpp_x5 <= 1'b0; fpp_x6 <= 1'b0; fpp_x7 <= 1'b0;
             sv0 <= 32'd0; sv1 <= 32'd0; sv2 <= 32'd0; sv3 <= 32'd0; sv4 <= 32'd0; sv5 <= 32'd0; sv6 <= 32'd0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
@@ -552,11 +591,17 @@ module rvex_core #(
                 cycles <= cycles + 1;
                 // r31 FP-13: the pending FP writes land at this edge whatever the packet does (a stall included);
                 // the commit branch below sets the next ones (nonblocking: its assignments win)
-                if (fpp_v4) gr[fpp_d4] <= fpu4_r;
-                if (fpp_v5) gr[fpp_d5] <= fpu5_r;
-                if (fpp_v6) gr[fpp_d6] <= fpu6_r;
-                if (fpp_v7) gr[fpp_d7] <= fpu7_r;
+                // r32: slot order, low half before high half, so the highest slot's write is the last one (FP-17)
+                if (fpp_v4) gr[fpp_d4] <= fpp_x4 ? fpx4_l : fpu4_r;
+                if (fpp_h4) gr[{fpp_d4[5:1], 1'b1}] <= fpx4_h;
+                if (fpp_v5) gr[fpp_d5] <= fpp_x5 ? fpx5_l : fpu5_r;
+                if (fpp_h5) gr[{fpp_d5[5:1], 1'b1}] <= fpx5_h;
+                if (fpp_v6) gr[fpp_d6] <= fpp_x6 ? fpx6_l : fpu6_r;
+                if (fpp_h6) gr[{fpp_d6[5:1], 1'b1}] <= fpx6_h;
+                if (fpp_v7) gr[fpp_d7] <= fpp_x7 ? fpx7_l : fpu7_r;
+                if (fpp_h7) gr[{fpp_d7[5:1], 1'b1}] <= fpx7_h;
                 fpp_v4 <= 1'b0; fpp_v5 <= 1'b0; fpp_v6 <= 1'b0; fpp_v7 <= 1'b0;
+                fpp_h4 <= 1'b0; fpp_h5 <= 1'b0; fpp_h6 <= 1'b0; fpp_h7 <= 1'b0;
                 if (stall_cnt != 0) begin
                     stall_cnt <= stall_cnt - 1;         // XNOP bubble
                 end else if (fstall) begin
@@ -665,10 +710,16 @@ module rvex_core #(
 
                     //--------------- PC / stall update ---------------
                     // FP-13: this packet's FP ops write at the next edge (FP-M14 mutant point: their destinations)
-                    fpp_v4 <= is_fpu(op4) && dst4 != 6'd0 && !(gw5 && dst5 == dst4) && !(gw6 && dst6 == dst4) && !(gw7 && dst7 == dst4); fpp_d4 <= dst4;
-                    fpp_v5 <= is_fpu(op5) && dst5 != 6'd0 && !(gw6 && dst6 == dst5) && !(gw7 && dst7 == dst5); fpp_d5 <= dst5;
-                    fpp_v6 <= is_fpu(op6) && dst6 != 6'd0 && !(gw7 && dst7 == dst6); fpp_d6 <= dst6;
-                    fpp_v7 <= is_fpu(op7) && dst7 != 6'd0; fpp_d7 <= dst7;
+                    // r32 FP-17 / FP-21: a pending half is dropped when a higher slot of the packet writes the same GR
+                    fpp_v4 <= (is_fpu(op4) || fx4) && dst4 != 6'd0 && !(gw5 && dst5 == dst4) && !(gw6 && dst6 == dst4) && !(gw7 && dst7 == dst4); fpp_d4 <= dst4;
+                    fpp_v5 <= (is_fpu(op5) || fx5) && dst5 != 6'd0 && !(gw6 && dst6 == dst5) && !(gw7 && dst7 == dst5); fpp_d5 <= dst5;
+                    fpp_v6 <= (is_fpu(op6) || fx6) && dst6 != 6'd0 && !(gw7 && dst7 == dst6); fpp_d6 <= dst6;
+                    fpp_v7 <= (is_fpu(op7) || fx7) && dst7 != 6'd0; fpp_d7 <= dst7;
+                    fpp_h4 <= fxp4 && dst4 != 6'd0 && !(gw5 && dst5 == (dst4 | 6'd1)) && !(gw6 && dst6 == (dst4 | 6'd1)) && !(gw7 && dst7 == (dst4 | 6'd1));
+                    fpp_h5 <= fxp5 && dst5 != 6'd0 && !(gw6 && dst6 == (dst5 | 6'd1)) && !(gw7 && dst7 == (dst5 | 6'd1));
+                    fpp_h6 <= fxp6 && dst6 != 6'd0 && !(gw7 && dst7 == (dst6 | 6'd1));
+                    fpp_h7 <= fxp7 && dst7 != 6'd0;
+                    fpp_x4 <= fx4; fpp_x5 <= fx5; fpp_x6 <= fx6; fpp_x7 <= fx7;
                     seq_k <= 3'd0;                          // MEM2-04: the next packet starts with its first access
                     if (slot0_is_ctrl && c_xnop) begin
                         stall_cnt <= c_xnop_n;              // NEW: XNOP stall n cycles

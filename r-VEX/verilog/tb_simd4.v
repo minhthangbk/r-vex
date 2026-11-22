@@ -62,9 +62,9 @@ module tb_simd4;
         P(1, NOP, NOP, NOP, NOP, q4(14, 2, 4, 4), q4(15, 2, 4, 5), q4(16, 2, 4, 6), q4(17, 2, 4, 7));
         // r3 and r5 (pair partners) written in the packet that reads them
         P(2, NOP, ri(`ALU_ADD, 5, 0, 0), ri(`ALU_ADD, 3, 0, 0), NOP, q4(18, 2, 4, 0), q4(19, 4, 2, 0), NOP, NOP);
-        // undefined forms: odd A field, imm type 01, odd B field, slots 0, 1, 2 and 3; slot 6 valid
+        // undefined forms: odd A field, imm type 11 sub-op 0 (r32; imm type 01 is the FP family, FP-18), odd B field, slots 0-3; slot 6 valid
         // (Codex R57 F3: slots 1 and 2 too, mutants SQ-M17 / SQ-M18 open their write paths)
-        P(3, q4(25, 6, 8, 0), q4(28, 6, 8, 0), q4(29, 6, 8, 0), q4(26, 6, 8, 0), q4(22, 7, 8, 0), {`SQ_SIMD4, `SHORT_IMM, 6'd23, 6'd6, 6'd8, 3'd0, 2'b00},
+        P(3, q4(25, 6, 8, 0), q4(28, 6, 8, 0), q4(29, 6, 8, 0), q4(26, 6, 8, 0), q4(22, 7, 8, 0), {`SQ_SIMD4, 2'b11, 6'd23, 6'd6, 6'd8, 3'd0, 2'b00},   /* r32: imm type 01 is fmadd (fpu.md FP-18); 11 sub-op 0 stays undefined (FP-19) */
           q4(27, 6, 8, 0), q4(24, 6, 9, 0));
         P(4, {`OP_STOP, 25'd0}, NOP, NOP, NOP, NOP, NOP, NOP, NOP);
         repeat (2) @(posedge clk); reset = 0; #1;
@@ -92,7 +92,7 @@ module tb_simd4;
         chk("SQ-06 pair partner r5 written in the packet is read old", c.gr[19], 32'h5F);
         chk("SQ-06 the packet's ALU writes land (r3)", c.gr[3], 32'd0);
         chk("SQ-05 odd A field writes nothing", c.gr[22], 32'hCAFE);
-        chk("SQ-05 imm type 01 writes nothing", c.gr[23], 32'hCAFE);
+        chk("SQ-05 imm type 11 sub-op 0 writes nothing (r32 FP-19)", c.gr[23], 32'hCAFE);
         chk("SQ-05 odd B field writes nothing", c.gr[24], 32'hCAFE);
         chk("SQ-05 slot 0 writes nothing", c.gr[25], 32'hCAFE);
         chk("SQ-05 slot 3 writes nothing", c.gr[26], 32'hCAFE);
@@ -101,8 +101,8 @@ module tb_simd4;
         chk("SQ-02 slot 6 valid next to undefined forms", c.gr[27], 32'd7);   // 1*3 + 1*4 + 0
         chk("SQ-07 PIU MUL16 counts the 11 defined 4-lane ops", c.u_piu.mul16, 11);
         chk("SQ-07 PIU MULPKT counts the 4 packets", c.u_piu.mulpkt, 4);
-        chk("SQ-07 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + flop", c.u_piu.ops,
-            c.u_piu.alu + c.u_piu.mul16 + c.u_piu.mul32 + c.u_piu.ld + c.u_piu.st + c.u_piu.ctl + c.u_piu.flop);
+        chk("SQ-07 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop (r32 PIU-22)", c.u_piu.ops,
+            c.u_piu.alu + c.u_piu.mul16 + c.u_piu.mul32 + c.u_piu.ld + c.u_piu.st + c.u_piu.ctl + c.u_piu.fpop);
         chk("SQ-05 SIMD4 = 0: the op writes nothing", c0.gr[10], 32'hBEEF);
         if (fail == 0) $display("RESULT: SIMD4 PASSED (%0d checks, %0d vectors)", pass, nv);
         else $display("RESULT: SIMD4 FAILED (%0d of %0d)", fail, pass + fail);
