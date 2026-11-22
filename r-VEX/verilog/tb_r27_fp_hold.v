@@ -10,7 +10,7 @@
 //   P2  FADD in slot 1 + a taken GOTO in slot 0: the PC moves only when the packet commits; P3 never runs
 //   P4  FSUB in slot 1 + XNOP 2 in slot 0: one hold, then the XNOP bubbles
 //   P5  STOP in slot 0 (FADD in slot 1): no hold
-//   FPSTALL = 4 (P0, P1, P2, P4); after STOP the core drains: no I or D request stays up (rule RR-11), with a cycle cap.
+//   r31 (FP-13 supersedes the hold): FPSTALL = 0, no packet reads a pending FP destination; after STOP the core drains: no I or D request stays up (rule RR-11), with a cycle cap.
 module tb_r27_fp_hold;
     reg clk = 0, reset = 1, start = 0;
     reg [255:0] i_rdata;
@@ -87,7 +87,10 @@ module tb_r27_fp_hold;
         chk("P2 fadd with the taken goto", dut.gr[9], 32'h40400000); // 3.0
         chk("P3 skipped by the goto", dut.gr[10], 32'h0000CAFE);
         chk("P4 fsub with the XNOP", dut.gr[8], 32'h3EC00000);       // 0.375
-        chk("PIU-21 FPSTALL = 4 held packets", dut.u_piu.fpstall, 4);
+        // r31 FP-13 (no hold) / FP-14: an FP result is pending for one edge; P1 follows P0 after a 2-cycle I stall (the
+        // write landed), P2 reads r4 only (P1 wrote r7), P4 after the GOTO reads r6 / r7 (P2 wrote r9), P5 follows the
+        // XNOP bubbles: no reader of a pending destination, so no interlock cycle
+        chk("PIU-21 FPSTALL = 0: no packet reads a pending FP destination (FP-13 / FP-14)", dut.u_piu.fpstall, 0);
         chk("PIU XNOP cycles", dut.u_piu.xnop, 2);
         chk("PIU DSTALL cycles", dut.u_piu.dstall, 2);
         // drain (RR-11): nothing requested after STOP

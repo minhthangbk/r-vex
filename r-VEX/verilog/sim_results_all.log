@@ -610,10 +610,10 @@ tb_fpu.v:46: $finish called at 1216201 (1s)
 
 ### Building tb_fpu_core ###
 ### Running  tb_fpu_core ###
-PASS FP-12 held cycle writes nothing got=0000000000000000
-PASS FP-12 held cycle keeps the PC got=0000000000000000
-PASS PIU-21 FPSTALL counts the held cycle got=0000000000000001
-PASS PIU-21 no packet committed in the held cycle got=0000000000000000
+PASS FP-13 the result is not written at the commit got=0000000000000000
+PASS FP-13 no hold: the PC moves on got=0000000000000001
+PASS FP-13 no hold: FPSTALL 0 after the commit cycle got=0000000000000000
+PASS FP-13 the packet committed in its first cycle got=0000000000000001
 PASS FP-01 slot 1 fadd got=0000000040700000
 PASS FP-01 slot 2 fmul got=0000000040580000
 PASS FP-05 next packet reads the result, slot 2 fsub got=000000003ec00000
@@ -634,7 +634,31 @@ PASS drain: STOP ends both cores (cap 4 cycles) got=0000000000000003
 PASS drain: no I or D request after STOP got=0000000000000000
 FPU CORE: 22 passed, 0 failed
 RESULT: FPU CORE PASSED
-tb_fpu_core.v:91: $finish called at 116000 (1ps)
+tb_fpu_core.v:94: $finish called at 116000 (1ps)
+
+### Building tb_fpu_pipe ###
+### Running  tb_fpu_pipe ###
+PASS FP-13 the FP packet commits in its first cycle (PC moves on) got=0000000000000001
+PASS FP-13 no hold: FPSTALL 0 got=0000000000000000
+PASS FP-13 the result is not written at the commit got=0000000000000000
+PASS FP-13 slot 4 fadd lands at the next edge got=0000000040700000
+PASS FP-13 slot 5 fmul got=0000000040580000
+PASS FP-13 slot 6 fsub got=000000003f400000
+PASS FP-13 slot 7 fadd got=0000000040400000
+PASS FP-13 the NOP packet after it is not held got=0000000000000000
+PASS FP-14 RAW: the reader is held one cycle (FPSTALL 1) got=0000000000000001
+PASS FP-14 RAW: the reader sees the FP result got=0000000040700000
+PASS FP-14 WAW: the later write of the FP destination wins got=0000000000000005
+PASS FP-14 pair: the dot4 reads the FP result through the odd half got=0000000000004072
+PASS FP-14 an independent packet is not held got=0000000000000003
+PASS FP-14 the independent add got=000000003fc00000
+PASS FP-13 slot 7 fsub of T5 got=000000003f400000
+PASS PIU-20 FLOP counts the FP ops of slots 4-7 got=0000000000000008
+PASS PIU-21 FPSTALL counts the two interlocked readers and the pair got=0000000000000003
+PASS drain: STOP ends the core got=0000000000000001
+FPU PIPE: 18 passed, 0 failed
+RESULT: FPU PIPE PASSED
+tb_fpu_pipe.v:88: $finish called at 176000 (1ps)
 
 ### Building tb_r27_fp_hold ###
 ### Running  tb_r27_fp_hold ###
@@ -651,13 +675,13 @@ PASS P1 I stall cycles got=2
 PASS P2 fadd with the taken goto got=40400000
 PASS P3 skipped by the goto got=cafe
 PASS P4 fsub with the XNOP got=3ec00000
-PASS PIU-21 FPSTALL = 4 held packets got=4
+PASS LL = 0: no packet reads a pending FP destination (FP-13 / FP-14) got=0
 PASS PIU XNOP cycles got=2
 PASS PIU DSTALL cycles got=2
 PASS drain: no I request after STOP got=0
 PASS drain: no D request after STOP got=0
 RESULT: R27 FP HOLD PASSED (18 checks)
-tb_r27_fp_hold.v:99: $finish called at 216000 (1ps)
+tb_r27_fp_hold.v:102: $finish called at 176000 (1ps)
 
 ### Building tb_mem2 ###
 ### Running  tb_mem2 ###
@@ -701,7 +725,7 @@ PASS C-11 EXT  PIU store pair: slot 3 wins (EN = 1) got=1
 PASS C-11 bare DMEM 0xFE00 untouched got=deadbeef
 PASS C-15 EXT  miss first: both loads got=3344ccdd
 PASS C-16 EXT  miss second: both loads got=3344ccdd
-PASS C-17 bare FP hold + slot-2 store got=5
+PASS C-17 bare FP op + slot-2 store got=5
 PASS C-17 EXT  the store is presented once got=1
 PASS C-17 fadd committed got=40700000
 PASS MEM2-05 bare LD counts both slots got=d
@@ -709,12 +733,12 @@ PASS MEM2-05 bare ST counts both slots got=e
 PASS MEM2-05 bare MEMSEQ = 0 got=0
 PASS MEM2-05 EXT  MEMSEQ = two-access packets (C-14: 9 + C-15 + C-16) got=b
 PASS MEM2-05 EXT  DSTALL = the two 3-cycle misses got=6
-PASS MEM2-05 EXT  FPSTALL = 1 got=1
-PASS MEM2-05 bare cycle law got=10
-PASS MEM2-05 EXT  cycle law got=21
+PASS MEM2-05 EXT  FPSTALL = 0 (FP-13: no hold; STOP follows C-17) got=0
+PASS MEM2-05 bare cycle law got=f
+PASS MEM2-05 EXT  cycle law got=20
 PASS MEM2-05 bare = EXT packets got=e
 RESULT: MEM2 PASSED (52 checks)
-tb_mem2.v:148: $finish called at 366000 (1ps)
+tb_mem2.v:149: $finish called at 356000 (1ps)
 
 ### Building tb_mem2_sys ###
 ### Running  tb_mem2_sys ###
@@ -1447,7 +1471,7 @@ tb_ldq.v:312: $finish called at 9316000 (1ps)
   PASS S3 dot2 in slot 1 writes nothing : 0x00000011
   PASS S3 mpyll in slot 2 writes nothing : 0x00000011
   PASS S3 fadd in slot 3 writes nothing : 0x00000011
-  PASS S3 fadd in slot 6 writes nothing : 0x00000011
+  PASS r31 FP-13: FPUs in slots 4-7; 1.0 + 1.0) : 0x40000000
   PASS S4 ldw in slot 4 writes nothing : 0x00000011
   PASS S4 stw in slot 5 stores nothing : 0x00000000
   PASS S6 slot 7 wins over slot 1 : 0x00000002
@@ -2561,6 +2585,7 @@ RESULT: CODEX PIU DUALCTRL PASSED
 RESULT: CODEX PIU R11 PASSED
 RESULT: FPU PASSED
 RESULT: FPU CORE PASSED
+RESULT: FPU PIPE PASSED
 RESULT: R27 FP HOLD PASSED (18 checks)
 RESULT: MEM2 PASSED (52 checks)
 RESULT: MEM2 SYS PASSED (66 checks)

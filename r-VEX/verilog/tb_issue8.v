@@ -37,7 +37,7 @@ module tb_issue8;
              mem(`MEM_LDW, 6'd21, 6'd30, 9'd0), mem(`MEM_LDW, 6'd22, 6'd30, 9'd4),
              rr(`MUL_MPYLL, 6'd23, 6'd2, 6'd3), rr(`MUL_MPYLL, 6'd24, 6'd2, 6'd2),
              rr(`MUL_MPYLL, 6'd25, 6'd3, 6'd3), rr(`SM_DOT2, 6'd26, 6'd4, 6'd5));
-        // S3 (IS8-01): multiply-class ops in slots 0-3 and an FPU op in slot 6 write nothing
+        // S3 (IS8-01): multiply-class ops in slots 0-3 write nothing; r31 FP-13: an FPU op in slot 6 is defined
         P(2, rr(`MUL_MPYLL, 6'd40, 6'd2, 6'd3), rr(`SM_DOT2, 6'd41, 6'd4, 6'd5), rr(`MUL_MPYLL, 6'd42, 6'd2, 6'd3),
              rr(`FPU_FADD, 6'd43, 6'd8, 6'd8), NOP, NOP, rr(`FPU_FADD, 6'd44, 6'd8, 6'd8), NOP);
         // S4 (IS8-01): memory opcodes in slots 4 and 5 do not access memory
@@ -87,7 +87,7 @@ module tb_issue8;
         chk("S3 dot2 in slot 1 writes nothing", dut.gr[41], 32'h11);
         chk("S3 mpyll in slot 2 writes nothing", dut.gr[42], 32'h11);
         chk("S3 fadd in slot 3 writes nothing", dut.gr[43], 32'h11);
-        chk("S3 fadd in slot 6 writes nothing", dut.gr[44], 32'h11);
+        chk("S3 fadd in slot 6 writes its result (r31 FP-13: FPUs in slots 4-7; 1.0 + 1.0)", dut.gr[44], 32'h4000_0000);
         chk("S4 ldw in slot 4 writes nothing", dut.gr[46], 32'h11);
         chk("S4 stw in slot 5 stores nothing", dut.dmem[32'h108 >> 2], 32'd0);
         chk("S6 slot 7 wins over slot 1", dut.gr[47], 2);

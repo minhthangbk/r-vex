@@ -130,7 +130,7 @@ module tb_mem2;
         chk("C-11 bare DMEM 0xFE00 untouched", b.dmem[16'hFE00 >> 2], 32'hDEAD_BEEF);
         chk("C-15 EXT  miss first: both loads", {e.gr[29][15:0], e.gr[30][15:0]}, {16'h3344, 16'hCCDD});
         chk("C-16 EXT  miss second: both loads", {e.gr[31][15:0], e.gr[32][15:0]}, {16'h3344, 16'hCCDD});
-        chk("C-17 bare FP hold + slot-2 store", getw_b(32'h1E0), 32'h5);
+        chk("C-17 bare FP op + slot-2 store", getw_b(32'h1E0), 32'h5);
         chk("C-17 EXT  the store is presented once", st14, 1);
         chk("C-17 fadd committed", e.gr[33], 32'h40700000);
         // ---- PIU accounting (MEM2-05) ----
@@ -139,7 +139,8 @@ module tb_mem2;
         chk("MEM2-05 bare MEMSEQ = 0", b.u_piu.memseq, 0);
         chk("MEM2-05 EXT  MEMSEQ = two-access packets (C-14: 9 + C-15 + C-16)", e.u_piu.memseq, 11);
         chk("MEM2-05 EXT  DSTALL = the two 3-cycle misses", e.u_piu.dstall, 6);
-        chk("MEM2-05 EXT  FPSTALL = 1", e.u_piu.fpstall, 1);
+        // r31 FP-13 (no hold): C-17's FP result is pending for one edge and the next packet is STOP (never held, FP-14)
+        chk("MEM2-05 EXT  FPSTALL = 0 (FP-13: no hold; STOP follows C-17)", e.u_piu.fpstall, 0);
         chk("MEM2-05 bare cycle law", b.u_piu.cyc[31:0], b.u_piu.pkt + b.u_piu.xnop + b.u_piu.istall + b.u_piu.dstall + b.u_piu.fpstall + b.u_piu.memseq + 1);   // PIU-13: + the STOP cycle
         chk("MEM2-05 EXT  cycle law", e.u_piu.cyc[31:0], e.u_piu.pkt + e.u_piu.xnop + e.u_piu.istall + e.u_piu.dstall + e.u_piu.fpstall + e.u_piu.memseq + 1);   // PIU-13: + the STOP cycle
         chk("MEM2-05 bare = EXT packets", b.u_piu.pkt, e.u_piu.pkt);

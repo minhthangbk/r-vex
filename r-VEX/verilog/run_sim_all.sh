@@ -71,6 +71,7 @@ wc -l < fpu_vec.txt > fpu_vec.n   # final verify r28 F9 sweep (BUG-355): the ben
 run tb_fpu               "rvex_defs.vh fpu.v"                   tb_fpu.v
 rm -f fpu_vec.txt fpu_vec.n
 run tb_fpu_core          "$CORE"                               tb_fpu_core.v
+run tb_fpu_pipe          "$CORE"                               tb_fpu_pipe.v   # r31 fpu.md FP-13 / FP-14: pipelined FPUs, interlock
 run tb_r27_fp_hold       "$CORE"                               tb_r27_fp_hold.v
 run tb_mem2             "$CORE"                               tb_mem2.v
 run tb_mem2_sys         "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_sem.v rvex_system.v" tb_mem2_sys.v

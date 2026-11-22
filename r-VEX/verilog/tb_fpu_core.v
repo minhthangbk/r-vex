@@ -2,8 +2,9 @@
 //   slot 1 and slot 2 ops in one packet, a dependent op in the next packet (latency 1), the immediate form,
 //   FPU codes in slots 0 and 3 write nothing (undefined ops, FP-08; slot 3 wrote 0 before BUG-320), code 15 stays ALU for the PIU, FLOP counts,
 //   and the same packets on an FPU=0 core write nothing (BUG-320; the r26 core wrote 0).
-//   FP-12 / PIU-21 (r27): a packet with an FP op in slot 1-2 is held one cycle (no write, same PC, FPSTALL + 1), then
-//   commits; the test drives each FP packet for two cycles (the FPU=0 core runs it twice and writes nothing).
+//   r31 FP-13 / FP-14 / PIU-21 (the r27 FP-12 hold is gone): an FP packet commits at once and its results land at the next
+//   edge; the test drives each FP packet for two cycles, so the second is an interlock on its own pending destinations
+//   (FPSTALL + 1 per FP packet; the FPU=0 core runs it twice and writes nothing).
 `timescale 1ns/1ps
 `include "rvex_defs.vh"
 `include "slot8.vh"
@@ -46,10 +47,12 @@ module tb_fpu_core;
         i_rdata = pk8(32'd0, rr(`FPU_FMUL, 6'd7, 6'd4, 6'd5), rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), 32'd0);
         pc0 = i_addr;
         @(posedge clk); #1;
-        chk("FP-12 held cycle writes nothing", dut.gr[6], 32'h0);
-        chk("FP-12 held cycle keeps the PC", i_addr, pc0);
-        chk("PIU-21 FPSTALL counts the held cycle", dut.u_piu.fpstall, 1);
-        chk("PIU-21 no packet committed in the held cycle", dut.u_piu.pkt, 0);
+        // r31 FP-13 (supersedes the FP-12 hold): the FP packet commits in its first cycle, its results land at the
+        // next edge; the bench drives it a second cycle, where its own destinations are pending: one FP-14 interlock
+        chk("FP-13 the result is not written at the commit", dut.gr[6], 32'h0);
+        chk("FP-13 no hold: the PC moves on", i_addr, pc0 + 12'd1);
+        chk("FP-13 no hold: FPSTALL 0 after the commit cycle", dut.u_piu.fpstall, 0);
+        chk("FP-13 the packet committed in its first cycle", dut.u_piu.pkt, 1);
         @(posedge clk); #1;
         chk("FP-01 slot 1 fadd", dut.gr[6], 32'h40700000);
         chk("FP-01 slot 2 fmul", dut.gr[7], 32'h40580000);

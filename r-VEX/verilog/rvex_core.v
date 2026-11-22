@@ -228,14 +228,19 @@ module rvex_core #(
     simd4 u_sq5(.sub(syl5[4:2]),.a0(gr_r1_5),.a1(gr[{r1a5[5:1],1'b1}]),.b0(gr_r2_5),.b1(gr[{r2a5[5:1],1'b1}]),.acc(gr[dst5]),.result(sq5_r));
     simd4 u_sq6(.sub(syl6[4:2]),.a0(gr_r1_6),.a1(gr[{r1a6[5:1],1'b1}]),.b0(gr_r2_6),.b1(gr[{r2a6[5:1],1'b1}]),.acc(gr[dst6]),.result(sq6_r));
     simd4 u_sq7(.sub(syl7[4:2]),.a0(gr_r1_7),.a1(gr[{r1a7[5:1],1'b1}]),.b0(gr_r2_7),.b1(gr[{r2a7[5:1],1'b1}]),.acc(gr[dst7]),.result(sq7_r));
-    wire [31:0] fpu4_r, fpu5_r; wire fpu4_v, fpu5_v;
-    wire        fp_wait;                 // FP-12, below
+    wire [31:0] fpu4_r, fpu5_r, fpu6_r, fpu7_r; wire fpu4_v, fpu5_v, fpu6_v, fpu7_v;
+    wire        fp_wait;                 // FP-14 interlock, below
+    wire        commit;                  // the packet commits this cycle (assigned below)
     generate if (FPU) begin : g_fpu
-        // FP-12 (r27): two stages; the stage register loads while the packet is held one cycle (fp_wait)
-        fpu #(.PIPE(1)) u_fpu4(.clk(clk),.ld(fp_wait),.fpuop(op4),.src1(gr_r1_4),.src2(a2_4),.result(fpu4_r),.out_valid(fpu4_v));
-        fpu #(.PIPE(1)) u_fpu5(.clk(clk),.ld(fp_wait),.fpuop(op5),.src1(gr_r1_5),.src2(a2_5),.result(fpu5_r),.out_valid(fpu5_v));
+        // r31 FP-13: four FPUs (slots 4-7), two stages without a hold: stage 1 loads when its packet commits, the
+        // result (stage 2, from the stage register only) is written by the pending write at the next clock edge
+        fpu #(.PIPE(1)) u_fpu4(.clk(clk),.ld(commit),.fpuop(op4),.src1(gr_r1_4),.src2(a2_4),.result(fpu4_r),.out_valid(fpu4_v));
+        fpu #(.PIPE(1)) u_fpu5(.clk(clk),.ld(commit),.fpuop(op5),.src1(gr_r1_5),.src2(a2_5),.result(fpu5_r),.out_valid(fpu5_v));
+        fpu #(.PIPE(1)) u_fpu6(.clk(clk),.ld(commit),.fpuop(op6),.src1(gr_r1_6),.src2(a2_6),.result(fpu6_r),.out_valid(fpu6_v));
+        fpu #(.PIPE(1)) u_fpu7(.clk(clk),.ld(commit),.fpuop(op7),.src1(gr_r1_7),.src2(a2_7),.result(fpu7_r),.out_valid(fpu7_v));
     end else begin : g_nofpu
         assign fpu4_r = 32'd0; assign fpu5_r = 32'd0; assign fpu4_v = 1'b0; assign fpu5_v = 1'b0;
+        assign fpu6_r = 32'd0; assign fpu7_r = 32'd0; assign fpu6_v = 1'b0; assign fpu7_v = 1'b0;
     end endgenerate
 
     // ---- 64-bit loads (r29 B2, reviews/contracts/ldd.md): ldd in slot 2 / 3, encoding E2 ----
@@ -448,10 +453,11 @@ module rvex_core #(
     // undefined there (the ALU does not decode it)
     wire        val1 = alu1_v;
     wire        val2 = slot2_is_mem ? 1'b0 : alu2_v;
-    wire        val4 = is_fpu(op4) ? fpu4_v : is_sq(op4) ? sq_ok(op4, imt4, r1a4, r2a4) : is_simd(op4) ? sm4_v : is_mul(op4) ? mul4_v : alu4_v;
-    wire        val5 = is_fpu(op5) ? fpu5_v : is_sq(op5) ? sq_ok(op5, imt5, r1a5, r2a5) : is_simd(op5) ? sm5_v : is_mul(op5) ? mul5_v : alu5_v;
-    wire        val6 = is_sq(op6) ? sq_ok(op6, imt6, r1a6, r2a6) : is_simd(op6) ? sm6_v : is_mul(op6) ? mul6_v : alu6_v;
-    wire        val7 = is_sq(op7) ? sq_ok(op7, imt7, r1a7, r2a7) : is_simd(op7) ? sm7_v : is_mul(op7) ? mul7_v : alu7_v;
+    // r31 FP-13: an FPU op writes through its pending write (next edge), never at its own commit
+    wire        val4 = is_fpu(op4) ? 1'b0 : is_sq(op4) ? sq_ok(op4, imt4, r1a4, r2a4) : is_simd(op4) ? sm4_v : is_mul(op4) ? mul4_v : alu4_v;
+    wire        val5 = is_fpu(op5) ? 1'b0 : is_sq(op5) ? sq_ok(op5, imt5, r1a5, r2a5) : is_simd(op5) ? sm5_v : is_mul(op5) ? mul5_v : alu5_v;
+    wire        val6 = is_fpu(op6) ? 1'b0 : is_sq(op6) ? sq_ok(op6, imt6, r1a6, r2a6) : is_simd(op6) ? sm6_v : is_mul(op6) ? mul6_v : alu6_v;
+    wire        val7 = is_fpu(op7) ? 1'b0 : is_sq(op7) ? sq_ok(op7, imt7, r1a7, r2a7) : is_simd(op7) ? sm7_v : is_mul(op7) ? mul7_v : alu7_v;
 
     // ---- external data port / miss stall ----
     assign i_req   = EXT_IMEM && running && !done && stall_cnt == 0;
@@ -460,9 +466,25 @@ module rvex_core #(
     // FP-12 (r27, user decision after the fmax A/B): a packet with an FP op in slot 1 or 2 is held for one cycle
     // (fp_wait: stage 1 of the FPU fills its register; nothing commits, no memory access is presented), then issues
     // with fp_ph = 1 (stage 2 result written back). Its operands cannot change while it is held (no commit).
-    reg    fp_ph;
-    wire   fp_pkt  = is_fpu(op4) || is_fpu(op5);   // r29: the FPU slots 4-5
-    assign fp_wait = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && fp_pkt && !fp_ph;
+    // r31 FP-13 / FP-14: one pending FP write per slot 4-7 (valid, destination); the next packet waits one cycle when
+    // any of its register fields names a pending destination (slots 2-7 by pair: ldq and the 4-lane ops read / write
+    // register pairs; a slot-0 control op also reads / writes GR1 (SP) and GR63 (LR)); FPSTALL counts that cycle
+    reg        fpp_v4, fpp_v5, fpp_v6, fpp_v7;
+    reg  [5:0] fpp_d4, fpp_d5, fpp_d6, fpp_d7;
+    // pair: the slot may hold a pair op (ldq in slots 2-3, a 4-lane op in slots 4-7); a field matches by pair only when
+    // the syllable is that op (r31: other ops by exact field, so an FP result in r9 does not hold a reader of r8)
+    function fhit; input [5:0] d; input [31:0] s; input pair; reg pr; begin
+        pr = pair && (s[31:25] == `MEM_LDQ || s[31:25] == `SQ_SIMD4);
+        fhit = pr ? (s[22:18] == d[5:1] || s[16:12] == d[5:1] || s[10:6] == d[5:1])
+                  : (s[22:17] == d || s[16:11] == d || s[10:5] == d); end endfunction
+    // every signal the match reads is an argument (a continuous assignment re-evaluates on its operands only)
+    function fdep; input [5:0] d; input [255:0] pk; input c0; begin
+        fdep = fhit(d, pk[31:0], 1'b0) || fhit(d, pk[63:32], 1'b0) || fhit(d, pk[95:64], 1'b1) || fhit(d, pk[127:96], 1'b1) ||
+               fhit(d, pk[159:128], 1'b1) || fhit(d, pk[191:160], 1'b1) || fhit(d, pk[223:192], 1'b1) ||
+               fhit(d, pk[255:224], 1'b1) || (c0 && (d == 6'd1 || d == 6'd63)); end endfunction
+    wire   fp_dep  = (fpp_v4 && fdep(fpp_d4, packet, slot0_is_ctrl)) || (fpp_v5 && fdep(fpp_d5, packet, slot0_is_ctrl)) ||
+                     (fpp_v6 && fdep(fpp_d6, packet, slot0_is_ctrl)) || (fpp_v7 && fdep(fpp_d7, packet, slot0_is_ctrl));
+    assign fp_wait = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && fp_dep;
     wire issue   = running && !done && stall_cnt == 0 && !fstall && !slot0_is_stop && !fp_wait;
     wire mem_acc = mem3_acc;
     assign d_req   = issue && (k0 < nacc);
@@ -482,7 +504,7 @@ module rvex_core #(
 
     // ---- performance indicator unit ----
     wire   active  = running && !done;
-    wire   commit  = issue && !dstall && !memseq;
+    assign commit  = issue && !dstall && !memseq;
     rvex_piu u_piu(.clk(clk), .reset(reset),
         .active(active), .commit(commit), .xnop_c(active && stall_cnt != 0), .fpstall_c(fp_wait),
         .istall_c(active && stall_cnt == 0 && fstall), .dstall_c(dstall),
@@ -492,7 +514,7 @@ module rvex_core #(
         .ctrl1(slot1_is_ctrl), .taken1(c1_taken),   // mwbr.md MW-05
         // r29 (IS8-06): the MUL / SIMD slots 4-7 and the FPU slots 4-5
         .mulv({is_mul(op7), is_mul(op6), is_mul(op5), is_mul(op4)}),
-        .fpv({is_fpu(op5), is_fpu(op4)}),            // PIU-20 FLOP (fpu.md FP-07)
+        .fpv({is_fpu(op7), is_fpu(op6), is_fpu(op5), is_fpu(op4)}),   // PIU-20 FLOP (fpu.md FP-07; r31 FP-13: slots 4-7)
         // simd16.md SM-06: MUL16 and MULPKT (r28); simd4.md SQ-07 (r30): a 4-lane op is one MUL16 op, one with an odd
         // pair field or imm type != 00 is undefined (writes nothing) and counts as an ALU op like codes 12..15
         .smv({is_simd(op7) || sq_ok(op7, imt7, r1a7, r2a7), is_simd(op6) || sq_ok(op6, imt6, r1a6, r2a6),
@@ -514,7 +536,8 @@ module rvex_core #(
     always @(posedge clk) begin
         if (reset) begin
             pc <= {PC_W{1'b0}}; stall_cnt <= 12'd0; running <= 1'b0; done <= 1'b0; cycles <= 32'd0;
-            stall_cycles <= 32'd0; istall_cycles <= 32'd0; fp_ph <= 1'b0; seq_k <= 3'd0;
+            stall_cycles <= 32'd0; istall_cycles <= 32'd0; seq_k <= 3'd0;
+            fpp_v4 <= 1'b0; fpp_v5 <= 1'b0; fpp_v6 <= 1'b0; fpp_v7 <= 1'b0;
             sv0 <= 32'd0; sv1 <= 32'd0; sv2 <= 32'd0; sv3 <= 32'd0; sv4 <= 32'd0; sv5 <= 32'd0; sv6 <= 32'd0;
             for (i=0;i<64;i=i+1) gr[i] <= 32'd0;
             for (i=0;i<8;i=i+1)  br[i] <= 1'b0;
@@ -522,6 +545,13 @@ module rvex_core #(
             if (start) running <= 1'b1;
             if (running && !done) begin
                 cycles <= cycles + 1;
+                // r31 FP-13: the pending FP writes land at this edge whatever the packet does (a stall included);
+                // the commit branch below sets the next ones (nonblocking: its assignments win)
+                if (fpp_v4) gr[fpp_d4] <= fpu4_r;
+                if (fpp_v5) gr[fpp_d5] <= fpu5_r;
+                if (fpp_v6) gr[fpp_d6] <= fpu6_r;
+                if (fpp_v7) gr[fpp_d7] <= fpu7_r;
+                fpp_v4 <= 1'b0; fpp_v5 <= 1'b0; fpp_v6 <= 1'b0; fpp_v7 <= 1'b0;
                 if (stall_cnt != 0) begin
                     stall_cnt <= stall_cnt - 1;         // XNOP bubble
                 end else if (fstall) begin
@@ -535,7 +565,7 @@ module rvex_core #(
                     if (dual_ok) case (seq_k) 3'd0: sv1 <= d2_rdata; 3'd1: sv2 <= d2_rdata; 3'd2: sv3 <= d2_rdata;
                                               3'd3: sv4 <= d2_rdata; 3'd4: sv5 <= d2_rdata; default: sv6 <= d2_rdata; endcase
                 end else if (fp_wait) begin
-                    fp_ph <= 1'b1;                       // FP-12: FPU stage 1, hold the packet one cycle
+                    // FP-14: the pending FP writes land this cycle; the packet issues in the next one
                 end else if (slot0_is_stop) begin
                     done <= 1'b1;                        // STOP
                 end else begin
@@ -629,7 +659,11 @@ module rvex_core #(
                     else if (op7 != `OP_NOP && val7 && dst7 != 6'd0) gr[dst7] <= res7;
 
                     //--------------- PC / stall update ---------------
-                    fp_ph <= 1'b0;                          // FP-12: the next packet starts in stage 1
+                    // FP-13: this packet's FP ops write at the next edge (FP-M14 mutant point: their destinations)
+                    fpp_v4 <= is_fpu(op4) && dst4 != 6'd0; fpp_d4 <= dst4;
+                    fpp_v5 <= is_fpu(op5) && dst5 != 6'd0; fpp_d5 <= dst5;
+                    fpp_v6 <= is_fpu(op6) && dst6 != 6'd0; fpp_d6 <= dst6;
+                    fpp_v7 <= is_fpu(op7) && dst7 != 6'd0; fpp_d7 <= dst7;
                     seq_k <= 3'd0;                          // MEM2-04: the next packet starts with its first access
                     if (slot0_is_ctrl && c_xnop) begin
                         stall_cnt <= c_xnop_n;              // NEW: XNOP stall n cycles

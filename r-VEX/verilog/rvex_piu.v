@@ -47,7 +47,7 @@ module rvex_piu (
     input  wire        ctrl1,      // slot 1 holds a control op (mwbr.md MW-05, r24)
     input  wire        taken1,     // ... a slot-1 branch changed the PC (slot 0 did not)
     input  wire [3:0]  mulv,       // r29: slot 4..7 op is in the multiply range (000xxxx, not NOP)
-    input  wire [1:0]  fpv,        // slot 4/5 op is an FPU op (PIU-20: not a multiply, not ALU)
+    input  wire [3:0]  fpv,        // slot 4..7 op is an FPU op (PIU-20: not a multiply, not ALU; r31 FP-13: 4 FPUs)
     input  wire [3:0]  smv,        // r28 (simd16.md SM-06): slot 4..7 op is a SIMD16 dual MAC (one MUL16 op each)
     input  wire        ld3, st3,   // slot 3 op is a load / a store
     input  wire        ld2, st2,   // r28 (MEM2-05): slot 2 op is a load / a store
@@ -86,7 +86,7 @@ module rvex_piu (
     wire [2:0] n_m16 = m16[0] + m16[1] + m16[2] + m16[3];
     wire [2:0] n_m32 = (md[0] && !m16[0]) + (md[1] && !m16[1]) + (md[2] && !m16[2]) + (md[3] && !m16[3]);
     wire [2:0] n_md  = md[0] + md[1] + md[2] + md[3];
-    wire [1:0] n_fp  = fpv[0] + fpv[1];
+    wire [2:0] n_fp  = fpv[0] + fpv[1] + fpv[2] + fpv[3];
     wire [3:0] n_alu = n_ops - n_md - n_fp - ld3 - st3 - ld2 - st2 - ctrl0 - ctrl1;
     wire       cnt = active && en;
     wire       cpk = cnt && commit;
