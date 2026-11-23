@@ -552,7 +552,9 @@ module rvex_core #(
     // pair: the slot may hold a pair op (ldq in slots 2-3, a 4-lane op in slots 4-7); a field matches by pair only when
     // the syllable is that op (r31: other ops by exact field, so an FP result in r9 does not hold a reader of r8)
     function fhit; input [5:0] d; input [31:0] s; input pair; reg pr, qd, od; begin
-        pr = pair && (s[31:25] == `MEM_LDQ || s[31:25] == `SQ_SIMD4);
+        // Codex R59-02 (FP-14): a 0x0F syllable matches by pair only for a pair form (the 4-lane ops, imm type 00, and the
+        // FP pair / cross-lane forms, fpx_pair); the scalar fmadd / fmsub / fmrsub (imm type 01, sub-op 0..2) by exact field
+        pr = pair && (s[31:25] == `MEM_LDQ || (s[31:25] == `SQ_SIMD4 && fpx_pair(s[24:23], s[4:2])));
         // r32 SD-05: a dot8 (0x0F imm type 10) reads the quads [16:13] / [10:7]
         qd = pair && s[31:25] == `SQ_SIMD4 && s[24:23] == 2'b10;
         od = pair && s[31:25] == `MEM_LDO;        // r32 LO-05: an ldo writes the quads [22:19] / [10:7], reads base [16:11]

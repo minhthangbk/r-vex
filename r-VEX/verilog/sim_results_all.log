@@ -686,13 +686,16 @@ PASS FP-17 BRIMM compare in slot 7 keeps the slot-4 FP write got=000000004070000
 PASS FP-17 an mtb in slot 6 does not drop the slot-5 FP write got=0000000040700000
 PASS LO-05 ldo quad destination (element 3): one interlock cycle got=0000000000000009
 PASS LO-05 ldo quad destination: the load's write is last got=0000000011111111
+PASS FP-14 R59-02 scalar fmadd naming r8 is not held by a pending r9 got=0000000000000009
+PASS FP-14 R59-02 scalar fmadd reading r9 is held one cycle got=000000000000000a
+PASS FP-14 R59-02 pair fadd2 reading r8:r9 is held one cycle got=000000000000000b
 PASS drain: STOP ends the core got=0000000000000001
 PASS FP-13 the FP op before STOP wrote its result got=0000000040700000
 PASS drain: no fetch after STOP got=0000000000000000
 PASS drain: no data access after STOP got=0000000000000000
-FPU PIPE: 44 passed, 0 failed
+FPU PIPE: 47 passed, 0 failed
 RESULT: FPU PIPE PASSED
-tb_fpu_pipe.v:198: $finish called at 916000 (1ps)
+tb_fpu_pipe.v:217: $finish called at 1036000 (1ps)
 
 ### Building tb_fpx_core ###
 ### Running  tb_fpx_core ###

@@ -10,7 +10,8 @@
 //   T6 FP-08: FPU codes in slots 1-2 write nothing; T7 FP-14: a store after an FP op is presented once with the result;
 //   T8 FP-14: a reader that waits on the fetch is not an FP interlock; T9 FP-17: same-packet FP / ALU WAW, highest slot
 //   wins; T10 MEM base under a D-stall; T11 ldd second destination; T12 ldq pair destination; T13 return reads LR;
-//   T14 an FP op before STOP; T15 BR-only writes (BRIMM compare, mtb) keep a pending FP write (BUG-399); drain with
+//   T14 an FP op before STOP; T15 BR-only writes (BRIMM compare, mtb) keep a pending FP write (BUG-399); T17 a scalar
+//   0x0F FP op matches by exact field, a pair form by pair (Codex R59-02); drain with
 //   TIMEOUT and idle ports
 // Mutants (mutate.py): FP-M12 (T6), FP-M15 (T7), FP-M16 (T8), FP-M13 (stage register loads on the held cycle only: T1 results wrong), FP-M14 (no
 // interlock: T2 / T4 read the old values), FP-M16 (pair halves not matched: T4), FP-M17 (FPSTALL not counted).
@@ -181,6 +182,24 @@ module tb_fpu_pipe;
         i_rdata = 256'd0; repeat (10) cyc;
         chk("LO-05 ldo quad destination (element 3): one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
         chk("LO-05 ldo quad destination: the load's write is last", dut.gr[35], 32'h11111111);
+        // T17 FP-14 (r32 Codex R59-02): a scalar 0x0F FP op (fmadd, imm type 01 sub-op 0) matches by exact field: with r9
+        // pending, fmadd r8 = r8 + r4 * r5 is not held (r8 is r9's pair sibling); fmadd r8 = r8 + r9 * r5 is held (the
+        // nearest invalid form); a pair form fadd2 r12:r13 = r8:r9 + r4:r5 is held (it reads r9 as a pair half)
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b01, 6'd8, 6'd4, 6'd5, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R59-02 scalar fmadd naming r8 is not held by a pending r9", dut.u_piu.fpstall, pc0);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b01, 6'd8, 6'd9, 6'd5, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R59-02 scalar fmadd reading r9 is held one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b01, 6'd12, 6'd8, 6'd4, 3'd3, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 R59-02 pair fadd2 reading r8:r9 is held one cycle", dut.u_piu.fpstall, pc0 + 1);
         // T14 FP-13 an FP op right before STOP still writes its result
         i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};
