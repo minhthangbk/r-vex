@@ -1864,6 +1864,72 @@ PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) dual got=1
 PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) dual+miss got=1
 PASS PIU  MEMSEQ EXT phase 2 = R0 7 holds got=7
 PASS PIU  MEMSEQ dual phase 2 = 3 got=3
+PASS all four cores end by STOP within the cap got=1
+PASS DRAIN no D request 8 cycles after done (RR-11) got=0
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000000
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000000
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000000
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000000
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000001
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000001
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000001
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000001
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000002
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000002
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000002
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000002
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000003
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000003
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000003
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000003
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000004
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000004
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000004
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000004
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000005
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000005
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000005
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000005
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000006
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000006
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000006
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000006
+PASS QBA  base r17 in quad A: words 0..7 bare got=a0000007
+PASS QBA  base r17 in quad A: words 0..7 EXT got=a0000007
+PASS QBA  base r17 in quad A: words 0..7 dual got=a0000007
+PASS QBA  base r17 in quad A: words 0..7 dual+miss got=a0000007
+PASS QBB  base r38 in quad B: words 8..15 bare got=a0000008
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a0000008
+PASS QBB  base r38 in quad B: words 8..15 dual got=a0000008
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a0000008
+PASS QBB  base r38 in quad B: words 8..15 bare got=a0000009
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a0000009
+PASS QBB  base r38 in quad B: words 8..15 dual got=a0000009
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a0000009
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000a
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000a
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000a
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000a
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000b
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000b
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000b
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000b
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000c
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000c
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000c
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000c
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000d
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000d
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000d
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000d
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000e
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000e
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000e
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000e
+PASS QBB  base r38 in quad B: words 8..15 bare got=a000000f
+PASS QBB  base r38 in quad B: words 8..15 EXT got=a000000f
+PASS QBB  base r38 in quad B: words 8..15 dual got=a000000f
+PASS QBB  base r38 in quad B: words 8..15 dual+miss got=a000000f
 PASS SEQ ldo2 p-1 e: order once got=1
 PASS SEQ ldo2 p-1 dual: order once got=1
 PASS SEQ ldo2 p-1 e: miss, DSTALL got=0
@@ -2402,8 +2468,8 @@ PASS SEQ ldo+ldo p15 values got=1
 PASS SEQ ldo+ldo p15 e: cycles = all hit + 3 got=14
 PASS SEQ ldo+ldo p15 dual: cycles got=9
 PASS SEQ ldo+ldo p15: no request after done got=0
-RESULT: LDO PASSED (864 checks)
-tb_ldo.v:310: $finish called at 20106000 (1ps)
+RESULT: LDO PASSED (930 checks)
+tb_ldo.v:326: $finish called at 20436000 (1ps)
 
 ### Building tb_issue8 ###
 ### Running  tb_issue8 ###
@@ -2511,7 +2577,7 @@ PASS SQ-07 PIU MULPKT counts the 4 packets got=4
 PASS 2 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop (r32 PIU-22) got=14
 PASS SQ-05 SIMD4 = 0: the op writes nothing got=beef
 RESULT: SIMD4 PASSED (27 checks, 20000 vectors)
-tb_simd4.v:109: $finish called at 20166000 (1ps)
+tb_simd4.v:110: $finish called at 20166000 (1ps)
 
 ### Building tb_dot8 ###
 ### Running  tb_dot8 ###
@@ -2543,7 +2609,7 @@ PASS SD-06 PIU MULPKT counts the 5 packets got=5
 PASS SD-06 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop got=13
 PASS SD-02 SIMD4 = 0: the op writes nothing got=beef
 RESULT: DOT8 PASSED (27 checks, 20000 vectors)
-tb_dot8.v:120: $finish called at 20196000 (1ps)
+tb_dot8.v:121: $finish called at 20196000 (1ps)
 
 ### Building tb_verify_piu_pkt ###
 ### Running  tb_verify_piu_pkt ###
@@ -3582,7 +3648,7 @@ RESULT: MEM2 PASSED (53 checks)
 RESULT: MEM2 SYS PASSED (66 checks)
 RESULT: LDD PASSED (97 checks)
 RESULT: LDQ PASSED (528 checks)
-RESULT: LDO PASSED (864 checks)
+RESULT: LDO PASSED (930 checks)
 RESULT: ISSUE8 PASSED
 RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
 RESULT: SIMD4 PASSED (27 checks, 20000 vectors)

@@ -14,6 +14,7 @@
 //            (0xFDE4), IOT 0xFFF0 (words 0..3 in the hw_sem page, 4..7 past 64 KB): no destination written, no external
 //            access (the I/O pages are one 512-byte run: any I/O word of an ldo makes word 0 or word 7 one); R0 quad A
 //            = r0..r3: r0 stays 0
+//   phase 3  QBA / QBB the base register inside quad A / quad B: the eight words of the old base (LO-02)
 //   PIU      LD counts each ldo once, MEMSEQ = the holds (e: nacc - 1 per packet; d: two accesses per cycle), DSTALL 3
 //            per miss, cycles = bare + MEMSEQ + DSTALL
 //   DRAIN    8 cycles after done no D request; SEQ one packet per shape on a single-port EXT core (s) and a DUAL_D
@@ -170,6 +171,9 @@ module tb_ldo;
     task run; begin
         @(posedge clk); start = 1; @(posedge clk); start = 0;
         cyc = 0; while (!(done_b && done_e && done_d && done_m) && cyc < 600) begin @(posedge clk); cyc = cyc + 1; end
+        if (!(done_b && done_e && done_d && done_m))
+            $display("TIMEOUT tb_ldo: run: no STOP of all four cores within 600 cycles (bare %0d EXT %0d dual %0d dual+miss %0d) (RR-11)",
+                     done_b, done_e, done_d, done_m);
         chk("all four cores end by STOP within the cap", done_b && done_e && done_d && done_m, 1);
         repeat (8) @(posedge clk); #1;
         chk("DRAIN no D request 8 cycles after done (RR-11)", {d_req, q_req, q2_req, m_req, m2_req}, 5'd0);
@@ -207,6 +211,8 @@ module tb_ldo;
         for (j = 8; j < 24; j = j + 1) begin s.gr[j] = PRE; t.gr[j] = PRE; end
         @(posedge clk); st = 1; @(posedge clk); st = 0;
         cyc = 0; while (!(done_s && done_t) && cyc < 200) begin @(posedge clk); cyc = cyc + 1; end
+        if (!(done_s && done_t)) $display("TIMEOUT tb_ldo: SEQ %0s p%0d: no STOP within 200 cycles (EXT %0d dual %0d) (RR-11)",
+                                          shn, p, done_s, done_t);
         repeat (8) @(posedge clk); #1;
         cyc_s = cycles_s; cyc_t = cycles_t;
         okt = done_s && done_t && ns == na;
@@ -304,6 +310,16 @@ module tb_ldo;
         chk3("PIU  MISALIGN counts the misaligned ldo once (LO-03)", 29, 32'd1);
         chk("PIU  MEMSEQ EXT phase 2 = R0 7 holds", e.gr[30], 32'd7);
         chk("PIU  MEMSEQ dual phase 2 = 3", d.gr[30], 32'd3);
+        // ---- phase 3 (Codex batch 4 F6, LO-02): the base register inside a destination quad: the address is read
+        // before the writes (quad A holds r17, quad B holds r38; slot 2 then slot 3, two packets)
+        P(0, ldo(16, 20, 17, 0),         NOP);                             // QBA: r17 = 0x100, quad A r16..r19
+        P(1, NOP,                        ldo(32, 36, 38, 32));             // QBB: r38 = 0x100, quad B r36..r39
+        STOPAT(2);
+        go;
+        setr(17, 32'h100); setr(38, 32'h100);
+        run;
+        chk8("QBA  base r17 in quad A: words 0..7", 16, 20, 0);
+        chk8("QBB  base r38 in quad B: words 8..15", 32, 36, 8);
         seq_matrix;
         if (fail) $display("RESULT: LDO FAILED (%0d of %0d)", fail, pass + fail);
         else $display("RESULT: LDO PASSED (%0d checks)", pass);

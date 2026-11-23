@@ -88,6 +88,7 @@ module tb_dot8;
         start = 1;
         while (!(done && done0) && cyc < 100) begin @(posedge clk); cyc = cyc + 1; end
         #1;
+        if (!(done && done0)) $display("TIMEOUT tb_dot8: no STOP of both cores within 100 cycles (RR-11)");
         chk("core runs end by STOP", done && done0, 1);
         repeat (8) @(posedge clk); #1;
         chk("DRAIN no D / I request 8 cycles after done", {c_dq, c_dq2, c_iq, c0_dq, c0_dq2, c0_iq}, 6'd0);
