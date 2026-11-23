@@ -129,6 +129,7 @@
 `define MEM_PFT     7'b0011001
 `define MEM_LDD     7'b0011010   // r29 ldd.md LDD-01: two words into two GRs (E2)
 `define MEM_LDQ     7'b0011011   // r30 ldq.md LQ-01: four words into two GR pairs (P2)
+`define MEM_LDO     7'b0011101   // r32 ldo.md LO-01: eight words into two GR quads (256 bits)
 
 // ---- CTRL opcodes ----
 `define CTRL_GOTO   7'b0100001

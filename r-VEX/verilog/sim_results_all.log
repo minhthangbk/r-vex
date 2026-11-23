@@ -684,13 +684,15 @@ PASS FP-14 return reads the FP result in LR: one interlock cycle got=00000000000
 PASS FP-14 return jumps to the FP result got=0000000000000000
 PASS FP-17 BRIMM compare in slot 7 keeps the slot-4 FP write got=0000000040700000
 PASS FP-17 an mtb in slot 6 does not drop the slot-5 FP write got=0000000040700000
+PASS LO-05 ldo quad destination (element 3): one interlock cycle got=0000000000000009
+PASS LO-05 ldo quad destination: the load's write is last got=0000000011111111
 PASS drain: STOP ends the core got=0000000000000001
 PASS FP-13 the FP op before STOP wrote its result got=0000000040700000
 PASS drain: no fetch after STOP got=0000000000000000
 PASS drain: no data access after STOP got=0000000000000000
-FPU PIPE: 42 passed, 0 failed
+FPU PIPE: 44 passed, 0 failed
 RESULT: FPU PIPE PASSED
-tb_fpu_pipe.v:189: $finish called at 716000 (1ps)
+tb_fpu_pipe.v:198: $finish called at 916000 (1ps)
 
 ### Building tb_fpx_core ###
 ### Running  tb_fpx_core ###
@@ -723,6 +725,15 @@ PASS FP-19 an odd pair field writes nothing (high) got=0000000022222222
 PASS FP-19 imm type 11 sub-op 0 writes nothing got=0000000033333333
 PASS FP-19 imm type 10 writes nothing (B2 dot8 later) got=0000000055555555
 PASS FP-19 the family in slot 2 writes nothing got=0000000066666666
+PASS FP-19 an odd rD field writes nothing (slot 4) got=0000000077777777
+PASS FP-19 an odd rB field writes nothing (low, slot 6) got=0000000088888888
+PASS FP-19 an odd rB field writes nothing (high) got=0000000099999999
+PASS FP-19 the family in slot 0 writes nothing (low) got=00000000aaaaaaaa
+PASS FP-19 the family in slot 0 writes nothing (high) got=00000000aaaaaaa1
+PASS FP-19 the family in slot 1 writes nothing (low) got=00000000bbbbbbbb
+PASS FP-19 the family in slot 1 writes nothing (high) got=00000000bbbbbbb1
+PASS FP-19 the family in slot 3 writes nothing (low) got=00000000cccccccc
+PASS FP-19 the family in slot 3 writes nothing (high) got=00000000ccccccc1
 PASS FP-17 / FP-21 slot 7 ALU write of rD + 1 wins got=0000000000000007
 PASS FP-21 the low lane of that pair is written got=0000000040600000
 PASS FP-18 fmadd chain on rD: the second op reads the first result got=0000000040c80000
@@ -732,9 +743,9 @@ PASS PIU-22 FPOP counts the FP ops got=0000000000000011
 PASS drain: STOP ends the core got=0000000000000001
 PASS drain: no fetch after STOP got=0000000000000000
 PASS drain: no data access after STOP got=0000000000000000
-FPX CORE: 38 passed, 0 failed
+FPX CORE: 47 passed, 0 failed
 RESULT: FPX CORE PASSED
-tb_fpx_core.v:108: $finish called at 336000 (1ps)
+tb_fpx_core.v:124: $finish called at 366000 (1ps)
 
 ### Building tb_r27_fp_hold ###
 ### Running  tb_r27_fp_hold ###
@@ -1525,6 +1536,875 @@ PASS SEQ ldq+ldq p7: no request after done got=0
 RESULT: LDQ PASSED (528 checks)
 tb_ldq.v:312: $finish called at 9316000 (1ps)
 
+### Building tb_ldo ###
+### Running  tb_ldo ###
+PASS all four cores end by STOP within the cap got=1
+PASS DRAIN no D request 8 cycles after done (RR-11) got=0
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000000
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000000
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000000
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000000
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000001
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000001
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000001
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000001
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000002
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000002
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000002
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000002
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000003
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000003
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000003
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000003
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000004
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000004
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000004
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000004
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000005
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000005
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000005
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000005
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000006
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000006
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000006
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000006
+PASS A    slot-3 ldo (EXT miss on word 2) bare got=a0000007
+PASS A    slot-3 ldo (EXT miss on word 2) EXT got=a0000007
+PASS A    slot-3 ldo (EXT miss on word 2) dual got=a0000007
+PASS A    slot-3 ldo (EXT miss on word 2) dual+miss got=a0000007
+PASS A2   slot-2 ldo (miss on word 0) bare got=a0000008
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a0000008
+PASS A2   slot-2 ldo (miss on word 0) dual got=a0000008
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a0000008
+PASS A2   slot-2 ldo (miss on word 0) bare got=a0000009
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a0000009
+PASS A2   slot-2 ldo (miss on word 0) dual got=a0000009
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a0000009
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000a
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000a
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000a
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000a
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000b
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000b
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000b
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000b
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000c
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000c
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000c
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000c
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000d
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000d
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000d
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000d
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000e
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000e
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000e
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000e
+PASS A2   slot-2 ldo (miss on word 0) bare got=a000000f
+PASS A2   slot-2 ldo (miss on word 0) EXT got=a000000f
+PASS A2   slot-2 ldo (miss on word 0) dual got=a000000f
+PASS A2   slot-2 ldo (miss on word 0) dual+miss got=a000000f
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000010
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000010
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000010
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000010
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000011
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000011
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000011
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000011
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000012
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000012
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000012
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000012
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000013
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000013
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000013
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000013
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000014
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000014
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000014
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000014
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000015
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000015
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000015
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000015
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000016
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000016
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000016
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000016
+PASS NEG  offset -1024 (QQ slot 2) bare got=a0000017
+PASS NEG  offset -1024 (QQ slot 2) EXT got=a0000017
+PASS NEG  offset -1024 (QQ slot 2) dual got=a0000017
+PASS NEG  offset -1024 (QQ slot 2) dual+miss got=a0000017
+PASS OFF  offset 1020 (QQ slot 3) bare got=a0000018
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a0000018
+PASS OFF  offset 1020 (QQ slot 3) dual got=a0000018
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a0000018
+PASS OFF  offset 1020 (QQ slot 3) bare got=a0000019
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a0000019
+PASS OFF  offset 1020 (QQ slot 3) dual got=a0000019
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a0000019
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001a
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001a
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001a
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001a
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001b
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001b
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001b
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001b
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001c
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001c
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001c
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001c
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001d
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001d
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001d
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001d
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001e
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001e
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001e
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001e
+PASS OFF  offset 1020 (QQ slot 3) bare got=a000001f
+PASS OFF  offset 1020 (QQ slot 3) EXT got=a000001f
+PASS OFF  offset 1020 (QQ slot 3) dual got=a000001f
+PASS OFF  offset 1020 (QQ slot 3) dual+miss got=a000001f
+PASS P-SL ldo words 32..38 bare got=a0000020
+PASS P-SL ldo words 32..38 EXT got=a0000020
+PASS P-SL ldo words 32..38 dual got=a0000020
+PASS P-SL ldo words 32..38 dual+miss got=a0000020
+PASS P-SL ldo words 32..38 bare got=a0000021
+PASS P-SL ldo words 32..38 EXT got=a0000021
+PASS P-SL ldo words 32..38 dual got=a0000021
+PASS P-SL ldo words 32..38 dual+miss got=a0000021
+PASS P-SL ldo words 32..38 bare got=a0000022
+PASS P-SL ldo words 32..38 EXT got=a0000022
+PASS P-SL ldo words 32..38 dual got=a0000022
+PASS P-SL ldo words 32..38 dual+miss got=a0000022
+PASS P-SL ldo words 32..38 bare got=a0000023
+PASS P-SL ldo words 32..38 EXT got=a0000023
+PASS P-SL ldo words 32..38 dual got=a0000023
+PASS P-SL ldo words 32..38 dual+miss got=a0000023
+PASS P-SL ldo words 32..38 bare got=a0000024
+PASS P-SL ldo words 32..38 EXT got=a0000024
+PASS P-SL ldo words 32..38 dual got=a0000024
+PASS P-SL ldo words 32..38 dual+miss got=a0000024
+PASS P-SL ldo words 32..38 bare got=a0000025
+PASS P-SL ldo words 32..38 EXT got=a0000025
+PASS P-SL ldo words 32..38 dual got=a0000025
+PASS P-SL ldo words 32..38 dual+miss got=a0000025
+PASS P-SL ldo words 32..38 bare got=a0000026
+PASS P-SL ldo words 32..38 EXT got=a0000026
+PASS P-SL ldo words 32..38 dual got=a0000026
+PASS P-SL ldo words 32..38 dual+miss got=a0000026
+PASS P-SL ldo reads the old word 39 bare got=a0000027
+PASS P-SL ldo reads the old word 39 EXT got=a0000027
+PASS P-SL ldo reads the old word 39 dual got=a0000027
+PASS P-SL ldo reads the old word 39 dual+miss got=a0000027
+PASS P-SL the store lands bare got=55667788
+PASS P-SL the store lands EXT got=55667788
+PASS P-SL the store lands dual got=55667788
+PASS P-SL the store lands dual+miss got=55667788
+PASS P-LS ldo words 40..47 bare got=a0000028
+PASS P-LS ldo words 40..47 EXT got=a0000028
+PASS P-LS ldo words 40..47 dual got=a0000028
+PASS P-LS ldo words 40..47 dual+miss got=a0000028
+PASS P-LS ldo words 40..47 bare got=a0000029
+PASS P-LS ldo words 40..47 EXT got=a0000029
+PASS P-LS ldo words 40..47 dual got=a0000029
+PASS P-LS ldo words 40..47 dual+miss got=a0000029
+PASS P-LS ldo words 40..47 bare got=a000002a
+PASS P-LS ldo words 40..47 EXT got=a000002a
+PASS P-LS ldo words 40..47 dual got=a000002a
+PASS P-LS ldo words 40..47 dual+miss got=a000002a
+PASS P-LS ldo words 40..47 bare got=a000002b
+PASS P-LS ldo words 40..47 EXT got=a000002b
+PASS P-LS ldo words 40..47 dual got=a000002b
+PASS P-LS ldo words 40..47 dual+miss got=a000002b
+PASS P-LS ldo words 40..47 bare got=a000002c
+PASS P-LS ldo words 40..47 EXT got=a000002c
+PASS P-LS ldo words 40..47 dual got=a000002c
+PASS P-LS ldo words 40..47 dual+miss got=a000002c
+PASS P-LS ldo words 40..47 bare got=a000002e
+PASS P-LS ldo words 40..47 EXT got=a000002e
+PASS P-LS ldo words 40..47 dual got=a000002e
+PASS P-LS ldo words 40..47 dual+miss got=a000002e
+PASS P-LS ldo words 40..47 bare got=a000002f
+PASS P-LS ldo words 40..47 EXT got=a000002f
+PASS P-LS ldo words 40..47 dual got=a000002f
+PASS P-LS ldo words 40..47 dual+miss got=a000002f
+PASS P-LS ldo reads the old word 45 bare got=a000002d
+PASS P-LS ldo reads the old word 45 EXT got=a000002d
+PASS P-LS ldo reads the old word 45 dual got=a000002d
+PASS P-LS ldo reads the old word 45 dual+miss got=a000002d
+PASS P-LS the store lands bare got=55667788
+PASS P-LS the store lands EXT got=55667788
+PASS P-LS the store lands dual got=55667788
+PASS P-LS the store lands dual+miss got=55667788
+PASS PIU  LD counts each ldo once (LO-07) bare got=6
+PASS PIU  LD counts each ldo once (LO-07) EXT got=6
+PASS PIU  LD counts each ldo once (LO-07) dual got=6
+PASS PIU  LD counts each ldo once (LO-07) dual+miss got=6
+PASS PIU  MEMSEQ bare = 0 got=0
+PASS PIU  MEMSEQ EXT = one hold per access after the first (LO-06) got=2d
+PASS PIU  MEMSEQ dual = two accesses per cycle (LO-06) got=15
+PASS EXT: 7 miss words, word 45 twice (P-LS ldo word 5 and the store) got=8
+PASS DSTALL EXT = 3 cycles per miss got=18
+PASS cycles EXT = bare + MEMSEQ + DSTALL got=4d
+PASS MISS dual+miss: 4 miss words on port 1 got=4
+PASS DSTALL dual+miss = 3 cycles per port-1 miss got=c
+PASS PIU  MEMSEQ dual+miss = MEMSEQ dual got=15
+PASS cycles dual+miss = bare + MEMSEQ + DSTALL got=29
+PASS cycles dual = bare + MEMSEQ got=1d
+PASS all four cores end by STOP within the cap got=1
+PASS DRAIN no D request 8 cycles after done (RR-11) got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS MA   misaligned: destination 0 bare got=0
+PASS MA   misaligned: destination 0 EXT got=0
+PASS MA   misaligned: destination 0 dual got=0
+PASS MA   misaligned: destination 0 dual+miss got=0
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   any word in the I/O page: destination kept bare got=5eed0000
+PASS IO   any word in the I/O page: destination kept EXT got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual got=5eed0000
+PASS IO   any word in the I/O page: destination kept dual+miss got=5eed0000
+PASS IO   no external access to the I/O page (EXT) got=0
+PASS R0   $r0.0 stays 0 bare got=0
+PASS R0   $r0.0 stays 0 EXT got=0
+PASS R0   $r0.0 stays 0 dual got=0
+PASS R0   $r0.0 stays 0 dual+miss got=0
+PASS R0   $r0.1 = word 1 bare got=a0000001
+PASS R0   $r0.1 = word 1 EXT got=a0000001
+PASS R0   $r0.1 = word 1 dual got=a0000001
+PASS R0   $r0.1 = word 1 dual+miss got=a0000001
+PASS R0   $r0.2 = word 2 bare got=a0000002
+PASS R0   $r0.2 = word 2 EXT got=a0000002
+PASS R0   $r0.2 = word 2 dual got=a0000002
+PASS R0   $r0.2 = word 2 dual+miss got=a0000002
+PASS R0   $r0.3 = word 3 bare got=a0000003
+PASS R0   $r0.3 = word 3 EXT got=a0000003
+PASS R0   $r0.3 = word 3 dual got=a0000003
+PASS R0   $r0.3 = word 3 dual+miss got=a0000003
+PASS R0   quad B = words 4..7 bare got=a0000004
+PASS R0   quad B = words 4..7 EXT got=a0000004
+PASS R0   quad B = words 4..7 dual got=a0000004
+PASS R0   quad B = words 4..7 dual+miss got=a0000004
+PASS R0   quad B = words 4..7 bare got=a0000005
+PASS R0   quad B = words 4..7 EXT got=a0000005
+PASS R0   quad B = words 4..7 dual got=a0000005
+PASS R0   quad B = words 4..7 dual+miss got=a0000005
+PASS R0   quad B = words 4..7 bare got=a0000006
+PASS R0   quad B = words 4..7 EXT got=a0000006
+PASS R0   quad B = words 4..7 dual got=a0000006
+PASS R0   quad B = words 4..7 dual+miss got=a0000006
+PASS R0   quad B = words 4..7 bare got=a0000007
+PASS R0   quad B = words 4..7 EXT got=a0000007
+PASS R0   quad B = words 4..7 dual got=a0000007
+PASS R0   quad B = words 4..7 dual+miss got=a0000007
+PASS PIU  LD counts the I/O and misaligned ldo too (LO-07) bare got=5
+PASS PIU  LD counts the I/O and misaligned ldo too (LO-07) EXT got=5
+PASS PIU  LD counts the I/O and misaligned ldo too (LO-07) dual got=5
+PASS PIU  LD counts the I/O and misaligned ldo too (LO-07) dual+miss got=5
+PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) bare got=1
+PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) EXT got=1
+PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) dual got=1
+PASS PIU  MISALIGN counts the misaligned ldo once (LO-03) dual+miss got=1
+PASS PIU  MEMSEQ EXT phase 2 = R0 7 holds got=7
+PASS PIU  MEMSEQ dual phase 2 = 3 got=3
+PASS SEQ ldo2 p-1 e: order once got=1
+PASS SEQ ldo2 p-1 dual: order once got=1
+PASS SEQ ldo2 p-1 e: miss, DSTALL got=0
+PASS SEQ ldo2 p-1 dual: miss, DSTALL got=0
+PASS SEQ ldo2 p-1 values got=1
+PASS SEQ ldo2 all hit: e - dual = extra holds got=4
+PASS SEQ ldo2 p-1: no request after done got=0
+PASS SEQ ldo2 p0 e: order once got=1
+PASS SEQ ldo2 p0 dual: order once got=1
+PASS SEQ ldo2 p0 e: miss, DSTALL got=103
+PASS SEQ ldo2 p0 dual: miss, DSTALL got=103
+PASS SEQ ldo2 p0 values got=1
+PASS SEQ ldo2 p0 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p0 dual: cycles got=8
+PASS SEQ ldo2 p0: no request after done got=0
+PASS SEQ ldo2 p1 e: order once got=1
+PASS SEQ ldo2 p1 dual: order once got=1
+PASS SEQ ldo2 p1 e: miss, DSTALL got=103
+PASS SEQ ldo2 p1 dual: miss, DSTALL got=0
+PASS SEQ ldo2 p1 values got=1
+PASS SEQ ldo2 p1 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p1 dual: cycles got=5
+PASS SEQ ldo2 p1: no request after done got=0
+PASS SEQ ldo2 p2 e: order once got=1
+PASS SEQ ldo2 p2 dual: order once got=1
+PASS SEQ ldo2 p2 e: miss, DSTALL got=103
+PASS SEQ ldo2 p2 dual: miss, DSTALL got=103
+PASS SEQ ldo2 p2 values got=1
+PASS SEQ ldo2 p2 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p2 dual: cycles got=8
+PASS SEQ ldo2 p2: no request after done got=0
+PASS SEQ ldo2 p3 e: order once got=1
+PASS SEQ ldo2 p3 dual: order once got=1
+PASS SEQ ldo2 p3 e: miss, DSTALL got=103
+PASS SEQ ldo2 p3 dual: miss, DSTALL got=0
+PASS SEQ ldo2 p3 values got=1
+PASS SEQ ldo2 p3 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p3 dual: cycles got=5
+PASS SEQ ldo2 p3: no request after done got=0
+PASS SEQ ldo2 p4 e: order once got=1
+PASS SEQ ldo2 p4 dual: order once got=1
+PASS SEQ ldo2 p4 e: miss, DSTALL got=103
+PASS SEQ ldo2 p4 dual: miss, DSTALL got=103
+PASS SEQ ldo2 p4 values got=1
+PASS SEQ ldo2 p4 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p4 dual: cycles got=8
+PASS SEQ ldo2 p4: no request after done got=0
+PASS SEQ ldo2 p5 e: order once got=1
+PASS SEQ ldo2 p5 dual: order once got=1
+PASS SEQ ldo2 p5 e: miss, DSTALL got=103
+PASS SEQ ldo2 p5 dual: miss, DSTALL got=0
+PASS SEQ ldo2 p5 values got=1
+PASS SEQ ldo2 p5 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p5 dual: cycles got=5
+PASS SEQ ldo2 p5: no request after done got=0
+PASS SEQ ldo2 p6 e: order once got=1
+PASS SEQ ldo2 p6 dual: order once got=1
+PASS SEQ ldo2 p6 e: miss, DSTALL got=103
+PASS SEQ ldo2 p6 dual: miss, DSTALL got=103
+PASS SEQ ldo2 p6 values got=1
+PASS SEQ ldo2 p6 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p6 dual: cycles got=8
+PASS SEQ ldo2 p6: no request after done got=0
+PASS SEQ ldo2 p7 e: order once got=1
+PASS SEQ ldo2 p7 dual: order once got=1
+PASS SEQ ldo2 p7 e: miss, DSTALL got=103
+PASS SEQ ldo2 p7 dual: miss, DSTALL got=0
+PASS SEQ ldo2 p7 values got=1
+PASS SEQ ldo2 p7 e: cycles = all hit + 3 got=c
+PASS SEQ ldo2 p7 dual: cycles got=5
+PASS SEQ ldo2 p7: no request after done got=0
+PASS SEQ ldo3 p-1 e: order once got=1
+PASS SEQ ldo3 p-1 dual: order once got=1
+PASS SEQ ldo3 p-1 e: miss, DSTALL got=0
+PASS SEQ ldo3 p-1 dual: miss, DSTALL got=0
+PASS SEQ ldo3 p-1 values got=1
+PASS SEQ ldo3 all hit: e - dual = extra holds got=4
+PASS SEQ ldo3 p-1: no request after done got=0
+PASS SEQ ldo3 p0 e: order once got=1
+PASS SEQ ldo3 p0 dual: order once got=1
+PASS SEQ ldo3 p0 e: miss, DSTALL got=103
+PASS SEQ ldo3 p0 dual: miss, DSTALL got=103
+PASS SEQ ldo3 p0 values got=1
+PASS SEQ ldo3 p0 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p0 dual: cycles got=8
+PASS SEQ ldo3 p0: no request after done got=0
+PASS SEQ ldo3 p1 e: order once got=1
+PASS SEQ ldo3 p1 dual: order once got=1
+PASS SEQ ldo3 p1 e: miss, DSTALL got=103
+PASS SEQ ldo3 p1 dual: miss, DSTALL got=0
+PASS SEQ ldo3 p1 values got=1
+PASS SEQ ldo3 p1 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p1 dual: cycles got=5
+PASS SEQ ldo3 p1: no request after done got=0
+PASS SEQ ldo3 p2 e: order once got=1
+PASS SEQ ldo3 p2 dual: order once got=1
+PASS SEQ ldo3 p2 e: miss, DSTALL got=103
+PASS SEQ ldo3 p2 dual: miss, DSTALL got=103
+PASS SEQ ldo3 p2 values got=1
+PASS SEQ ldo3 p2 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p2 dual: cycles got=8
+PASS SEQ ldo3 p2: no request after done got=0
+PASS SEQ ldo3 p3 e: order once got=1
+PASS SEQ ldo3 p3 dual: order once got=1
+PASS SEQ ldo3 p3 e: miss, DSTALL got=103
+PASS SEQ ldo3 p3 dual: miss, DSTALL got=0
+PASS SEQ ldo3 p3 values got=1
+PASS SEQ ldo3 p3 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p3 dual: cycles got=5
+PASS SEQ ldo3 p3: no request after done got=0
+PASS SEQ ldo3 p4 e: order once got=1
+PASS SEQ ldo3 p4 dual: order once got=1
+PASS SEQ ldo3 p4 e: miss, DSTALL got=103
+PASS SEQ ldo3 p4 dual: miss, DSTALL got=103
+PASS SEQ ldo3 p4 values got=1
+PASS SEQ ldo3 p4 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p4 dual: cycles got=8
+PASS SEQ ldo3 p4: no request after done got=0
+PASS SEQ ldo3 p5 e: order once got=1
+PASS SEQ ldo3 p5 dual: order once got=1
+PASS SEQ ldo3 p5 e: miss, DSTALL got=103
+PASS SEQ ldo3 p5 dual: miss, DSTALL got=0
+PASS SEQ ldo3 p5 values got=1
+PASS SEQ ldo3 p5 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p5 dual: cycles got=5
+PASS SEQ ldo3 p5: no request after done got=0
+PASS SEQ ldo3 p6 e: order once got=1
+PASS SEQ ldo3 p6 dual: order once got=1
+PASS SEQ ldo3 p6 e: miss, DSTALL got=103
+PASS SEQ ldo3 p6 dual: miss, DSTALL got=103
+PASS SEQ ldo3 p6 values got=1
+PASS SEQ ldo3 p6 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p6 dual: cycles got=8
+PASS SEQ ldo3 p6: no request after done got=0
+PASS SEQ ldo3 p7 e: order once got=1
+PASS SEQ ldo3 p7 dual: order once got=1
+PASS SEQ ldo3 p7 e: miss, DSTALL got=103
+PASS SEQ ldo3 p7 dual: miss, DSTALL got=0
+PASS SEQ ldo3 p7 values got=1
+PASS SEQ ldo3 p7 e: cycles = all hit + 3 got=c
+PASS SEQ ldo3 p7 dual: cycles got=5
+PASS SEQ ldo3 p7: no request after done got=0
+PASS SEQ ldo+st p-1 e: order once got=1
+PASS SEQ ldo+st p-1 dual: order once got=1
+PASS SEQ ldo+st p-1 e: miss, DSTALL got=0
+PASS SEQ ldo+st p-1 dual: miss, DSTALL got=0
+PASS SEQ ldo+st p-1 values got=1
+PASS SEQ ldo+st all hit: e - dual = extra holds got=4
+PASS SEQ ldo+st p-1: no request after done got=0
+PASS SEQ ldo+st p0 e: order once got=1
+PASS SEQ ldo+st p0 dual: order once got=1
+PASS SEQ ldo+st p0 e: miss, DSTALL got=103
+PASS SEQ ldo+st p0 dual: miss, DSTALL got=103
+PASS SEQ ldo+st p0 values got=1
+PASS SEQ ldo+st p0 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p0 dual: cycles got=9
+PASS SEQ ldo+st p0: no request after done got=0
+PASS SEQ ldo+st p1 e: order once got=1
+PASS SEQ ldo+st p1 dual: order once got=1
+PASS SEQ ldo+st p1 e: miss, DSTALL got=103
+PASS SEQ ldo+st p1 dual: miss, DSTALL got=0
+PASS SEQ ldo+st p1 values got=1
+PASS SEQ ldo+st p1 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p1 dual: cycles got=6
+PASS SEQ ldo+st p1: no request after done got=0
+PASS SEQ ldo+st p2 e: order once got=1
+PASS SEQ ldo+st p2 dual: order once got=1
+PASS SEQ ldo+st p2 e: miss, DSTALL got=103
+PASS SEQ ldo+st p2 dual: miss, DSTALL got=103
+PASS SEQ ldo+st p2 values got=1
+PASS SEQ ldo+st p2 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p2 dual: cycles got=9
+PASS SEQ ldo+st p2: no request after done got=0
+PASS SEQ ldo+st p3 e: order once got=1
+PASS SEQ ldo+st p3 dual: order once got=1
+PASS SEQ ldo+st p3 e: miss, DSTALL got=103
+PASS SEQ ldo+st p3 dual: miss, DSTALL got=0
+PASS SEQ ldo+st p3 values got=1
+PASS SEQ ldo+st p3 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p3 dual: cycles got=6
+PASS SEQ ldo+st p3: no request after done got=0
+PASS SEQ ldo+st p4 e: order once got=1
+PASS SEQ ldo+st p4 dual: order once got=1
+PASS SEQ ldo+st p4 e: miss, DSTALL got=103
+PASS SEQ ldo+st p4 dual: miss, DSTALL got=103
+PASS SEQ ldo+st p4 values got=1
+PASS SEQ ldo+st p4 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p4 dual: cycles got=9
+PASS SEQ ldo+st p4: no request after done got=0
+PASS SEQ ldo+st p5 e: order once got=1
+PASS SEQ ldo+st p5 dual: order once got=1
+PASS SEQ ldo+st p5 e: miss, DSTALL got=103
+PASS SEQ ldo+st p5 dual: miss, DSTALL got=0
+PASS SEQ ldo+st p5 values got=1
+PASS SEQ ldo+st p5 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p5 dual: cycles got=6
+PASS SEQ ldo+st p5: no request after done got=0
+PASS SEQ ldo+st p6 e: order once got=1
+PASS SEQ ldo+st p6 dual: order once got=1
+PASS SEQ ldo+st p6 e: miss, DSTALL got=103
+PASS SEQ ldo+st p6 dual: miss, DSTALL got=103
+PASS SEQ ldo+st p6 values got=1
+PASS SEQ ldo+st p6 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p6 dual: cycles got=9
+PASS SEQ ldo+st p6: no request after done got=0
+PASS SEQ ldo+st p7 e: order once got=1
+PASS SEQ ldo+st p7 dual: order once got=1
+PASS SEQ ldo+st p7 e: miss, DSTALL got=103
+PASS SEQ ldo+st p7 dual: miss, DSTALL got=0
+PASS SEQ ldo+st p7 values got=1
+PASS SEQ ldo+st p7 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p7 dual: cycles got=6
+PASS SEQ ldo+st p7: no request after done got=0
+PASS SEQ ldo+st p8 e: order once got=1
+PASS SEQ ldo+st p8 dual: order once got=1
+PASS SEQ ldo+st p8 e: miss, DSTALL got=103
+PASS SEQ ldo+st p8 dual: miss, DSTALL got=103
+PASS SEQ ldo+st p8 values got=1
+PASS SEQ ldo+st p8 e: cycles = all hit + 3 got=d
+PASS SEQ ldo+st p8 dual: cycles got=9
+PASS SEQ ldo+st p8: no request after done got=0
+PASS SEQ st+ldo p-1 e: order once got=1
+PASS SEQ st+ldo p-1 dual: order once got=1
+PASS SEQ st+ldo p-1 e: miss, DSTALL got=0
+PASS SEQ st+ldo p-1 dual: miss, DSTALL got=0
+PASS SEQ st+ldo p-1 values got=1
+PASS SEQ st+ldo all hit: e - dual = extra holds got=4
+PASS SEQ st+ldo p-1: no request after done got=0
+PASS SEQ st+ldo p0 e: order once got=1
+PASS SEQ st+ldo p0 dual: order once got=1
+PASS SEQ st+ldo p0 e: miss, DSTALL got=103
+PASS SEQ st+ldo p0 dual: miss, DSTALL got=103
+PASS SEQ st+ldo p0 values got=1
+PASS SEQ st+ldo p0 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p0 dual: cycles got=9
+PASS SEQ st+ldo p0: no request after done got=0
+PASS SEQ st+ldo p1 e: order once got=1
+PASS SEQ st+ldo p1 dual: order once got=1
+PASS SEQ st+ldo p1 e: miss, DSTALL got=103
+PASS SEQ st+ldo p1 dual: miss, DSTALL got=0
+PASS SEQ st+ldo p1 values got=1
+PASS SEQ st+ldo p1 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p1 dual: cycles got=6
+PASS SEQ st+ldo p1: no request after done got=0
+PASS SEQ st+ldo p2 e: order once got=1
+PASS SEQ st+ldo p2 dual: order once got=1
+PASS SEQ st+ldo p2 e: miss, DSTALL got=103
+PASS SEQ st+ldo p2 dual: miss, DSTALL got=103
+PASS SEQ st+ldo p2 values got=1
+PASS SEQ st+ldo p2 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p2 dual: cycles got=9
+PASS SEQ st+ldo p2: no request after done got=0
+PASS SEQ st+ldo p3 e: order once got=1
+PASS SEQ st+ldo p3 dual: order once got=1
+PASS SEQ st+ldo p3 e: miss, DSTALL got=103
+PASS SEQ st+ldo p3 dual: miss, DSTALL got=0
+PASS SEQ st+ldo p3 values got=1
+PASS SEQ st+ldo p3 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p3 dual: cycles got=6
+PASS SEQ st+ldo p3: no request after done got=0
+PASS SEQ st+ldo p4 e: order once got=1
+PASS SEQ st+ldo p4 dual: order once got=1
+PASS SEQ st+ldo p4 e: miss, DSTALL got=103
+PASS SEQ st+ldo p4 dual: miss, DSTALL got=103
+PASS SEQ st+ldo p4 values got=1
+PASS SEQ st+ldo p4 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p4 dual: cycles got=9
+PASS SEQ st+ldo p4: no request after done got=0
+PASS SEQ st+ldo p5 e: order once got=1
+PASS SEQ st+ldo p5 dual: order once got=1
+PASS SEQ st+ldo p5 e: miss, DSTALL got=103
+PASS SEQ st+ldo p5 dual: miss, DSTALL got=0
+PASS SEQ st+ldo p5 values got=1
+PASS SEQ st+ldo p5 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p5 dual: cycles got=6
+PASS SEQ st+ldo p5: no request after done got=0
+PASS SEQ st+ldo p6 e: order once got=1
+PASS SEQ st+ldo p6 dual: order once got=1
+PASS SEQ st+ldo p6 e: miss, DSTALL got=103
+PASS SEQ st+ldo p6 dual: miss, DSTALL got=103
+PASS SEQ st+ldo p6 values got=1
+PASS SEQ st+ldo p6 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p6 dual: cycles got=9
+PASS SEQ st+ldo p6: no request after done got=0
+PASS SEQ st+ldo p7 e: order once got=1
+PASS SEQ st+ldo p7 dual: order once got=1
+PASS SEQ st+ldo p7 e: miss, DSTALL got=103
+PASS SEQ st+ldo p7 dual: miss, DSTALL got=0
+PASS SEQ st+ldo p7 values got=1
+PASS SEQ st+ldo p7 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p7 dual: cycles got=6
+PASS SEQ st+ldo p7: no request after done got=0
+PASS SEQ st+ldo p8 e: order once got=1
+PASS SEQ st+ldo p8 dual: order once got=1
+PASS SEQ st+ldo p8 e: miss, DSTALL got=103
+PASS SEQ st+ldo p8 dual: miss, DSTALL got=103
+PASS SEQ st+ldo p8 values got=1
+PASS SEQ st+ldo p8 e: cycles = all hit + 3 got=d
+PASS SEQ st+ldo p8 dual: cycles got=9
+PASS SEQ st+ldo p8: no request after done got=0
+PASS SEQ ldq+ldo p-1 e: order once got=1
+PASS SEQ ldq+ldo p-1 dual: order once got=1
+PASS SEQ ldq+ldo p-1 e: miss, DSTALL got=0
+PASS SEQ ldq+ldo p-1 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p-1 values got=1
+PASS SEQ ldq+ldo all hit: e - dual = extra holds got=6
+PASS SEQ ldq+ldo p-1: no request after done got=0
+PASS SEQ ldq+ldo p0 e: order once got=1
+PASS SEQ ldq+ldo p0 dual: order once got=1
+PASS SEQ ldq+ldo p0 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p0 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p0 values got=1
+PASS SEQ ldq+ldo p0 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p0 dual: cycles got=a
+PASS SEQ ldq+ldo p0: no request after done got=0
+PASS SEQ ldq+ldo p1 e: order once got=1
+PASS SEQ ldq+ldo p1 dual: order once got=1
+PASS SEQ ldq+ldo p1 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p1 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p1 values got=1
+PASS SEQ ldq+ldo p1 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p1 dual: cycles got=7
+PASS SEQ ldq+ldo p1: no request after done got=0
+PASS SEQ ldq+ldo p2 e: order once got=1
+PASS SEQ ldq+ldo p2 dual: order once got=1
+PASS SEQ ldq+ldo p2 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p2 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p2 values got=1
+PASS SEQ ldq+ldo p2 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p2 dual: cycles got=a
+PASS SEQ ldq+ldo p2: no request after done got=0
+PASS SEQ ldq+ldo p3 e: order once got=1
+PASS SEQ ldq+ldo p3 dual: order once got=1
+PASS SEQ ldq+ldo p3 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p3 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p3 values got=1
+PASS SEQ ldq+ldo p3 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p3 dual: cycles got=7
+PASS SEQ ldq+ldo p3: no request after done got=0
+PASS SEQ ldq+ldo p4 e: order once got=1
+PASS SEQ ldq+ldo p4 dual: order once got=1
+PASS SEQ ldq+ldo p4 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p4 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p4 values got=1
+PASS SEQ ldq+ldo p4 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p4 dual: cycles got=a
+PASS SEQ ldq+ldo p4: no request after done got=0
+PASS SEQ ldq+ldo p5 e: order once got=1
+PASS SEQ ldq+ldo p5 dual: order once got=1
+PASS SEQ ldq+ldo p5 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p5 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p5 values got=1
+PASS SEQ ldq+ldo p5 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p5 dual: cycles got=7
+PASS SEQ ldq+ldo p5: no request after done got=0
+PASS SEQ ldq+ldo p6 e: order once got=1
+PASS SEQ ldq+ldo p6 dual: order once got=1
+PASS SEQ ldq+ldo p6 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p6 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p6 values got=1
+PASS SEQ ldq+ldo p6 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p6 dual: cycles got=a
+PASS SEQ ldq+ldo p6: no request after done got=0
+PASS SEQ ldq+ldo p7 e: order once got=1
+PASS SEQ ldq+ldo p7 dual: order once got=1
+PASS SEQ ldq+ldo p7 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p7 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p7 values got=1
+PASS SEQ ldq+ldo p7 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p7 dual: cycles got=7
+PASS SEQ ldq+ldo p7: no request after done got=0
+PASS SEQ ldq+ldo p8 e: order once got=1
+PASS SEQ ldq+ldo p8 dual: order once got=1
+PASS SEQ ldq+ldo p8 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p8 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p8 values got=1
+PASS SEQ ldq+ldo p8 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p8 dual: cycles got=a
+PASS SEQ ldq+ldo p8: no request after done got=0
+PASS SEQ ldq+ldo p9 e: order once got=1
+PASS SEQ ldq+ldo p9 dual: order once got=1
+PASS SEQ ldq+ldo p9 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p9 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p9 values got=1
+PASS SEQ ldq+ldo p9 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p9 dual: cycles got=7
+PASS SEQ ldq+ldo p9: no request after done got=0
+PASS SEQ ldq+ldo p10 e: order once got=1
+PASS SEQ ldq+ldo p10 dual: order once got=1
+PASS SEQ ldq+ldo p10 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p10 dual: miss, DSTALL got=103
+PASS SEQ ldq+ldo p10 values got=1
+PASS SEQ ldq+ldo p10 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p10 dual: cycles got=a
+PASS SEQ ldq+ldo p10: no request after done got=0
+PASS SEQ ldq+ldo p11 e: order once got=1
+PASS SEQ ldq+ldo p11 dual: order once got=1
+PASS SEQ ldq+ldo p11 e: miss, DSTALL got=103
+PASS SEQ ldq+ldo p11 dual: miss, DSTALL got=0
+PASS SEQ ldq+ldo p11 values got=1
+PASS SEQ ldq+ldo p11 e: cycles = all hit + 3 got=10
+PASS SEQ ldq+ldo p11 dual: cycles got=7
+PASS SEQ ldq+ldo p11: no request after done got=0
+PASS SEQ ldo+ldo p-1 e: order once got=1
+PASS SEQ ldo+ldo p-1 dual: order once got=1
+PASS SEQ ldo+ldo p-1 e: miss, DSTALL got=0
+PASS SEQ ldo+ldo p-1 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p-1 values got=1
+PASS SEQ ldo+ldo all hit: e - dual = extra holds got=8
+PASS SEQ ldo+ldo p-1: no request after done got=0
+PASS SEQ ldo+ldo p0 e: order once got=1
+PASS SEQ ldo+ldo p0 dual: order once got=1
+PASS SEQ ldo+ldo p0 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p0 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p0 values got=1
+PASS SEQ ldo+ldo p0 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p0 dual: cycles got=c
+PASS SEQ ldo+ldo p0: no request after done got=0
+PASS SEQ ldo+ldo p1 e: order once got=1
+PASS SEQ ldo+ldo p1 dual: order once got=1
+PASS SEQ ldo+ldo p1 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p1 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p1 values got=1
+PASS SEQ ldo+ldo p1 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p1 dual: cycles got=9
+PASS SEQ ldo+ldo p1: no request after done got=0
+PASS SEQ ldo+ldo p2 e: order once got=1
+PASS SEQ ldo+ldo p2 dual: order once got=1
+PASS SEQ ldo+ldo p2 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p2 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p2 values got=1
+PASS SEQ ldo+ldo p2 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p2 dual: cycles got=c
+PASS SEQ ldo+ldo p2: no request after done got=0
+PASS SEQ ldo+ldo p3 e: order once got=1
+PASS SEQ ldo+ldo p3 dual: order once got=1
+PASS SEQ ldo+ldo p3 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p3 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p3 values got=1
+PASS SEQ ldo+ldo p3 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p3 dual: cycles got=9
+PASS SEQ ldo+ldo p3: no request after done got=0
+PASS SEQ ldo+ldo p4 e: order once got=1
+PASS SEQ ldo+ldo p4 dual: order once got=1
+PASS SEQ ldo+ldo p4 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p4 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p4 values got=1
+PASS SEQ ldo+ldo p4 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p4 dual: cycles got=c
+PASS SEQ ldo+ldo p4: no request after done got=0
+PASS SEQ ldo+ldo p5 e: order once got=1
+PASS SEQ ldo+ldo p5 dual: order once got=1
+PASS SEQ ldo+ldo p5 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p5 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p5 values got=1
+PASS SEQ ldo+ldo p5 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p5 dual: cycles got=9
+PASS SEQ ldo+ldo p5: no request after done got=0
+PASS SEQ ldo+ldo p6 e: order once got=1
+PASS SEQ ldo+ldo p6 dual: order once got=1
+PASS SEQ ldo+ldo p6 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p6 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p6 values got=1
+PASS SEQ ldo+ldo p6 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p6 dual: cycles got=c
+PASS SEQ ldo+ldo p6: no request after done got=0
+PASS SEQ ldo+ldo p7 e: order once got=1
+PASS SEQ ldo+ldo p7 dual: order once got=1
+PASS SEQ ldo+ldo p7 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p7 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p7 values got=1
+PASS SEQ ldo+ldo p7 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p7 dual: cycles got=9
+PASS SEQ ldo+ldo p7: no request after done got=0
+PASS SEQ ldo+ldo p8 e: order once got=1
+PASS SEQ ldo+ldo p8 dual: order once got=1
+PASS SEQ ldo+ldo p8 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p8 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p8 values got=1
+PASS SEQ ldo+ldo p8 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p8 dual: cycles got=c
+PASS SEQ ldo+ldo p8: no request after done got=0
+PASS SEQ ldo+ldo p9 e: order once got=1
+PASS SEQ ldo+ldo p9 dual: order once got=1
+PASS SEQ ldo+ldo p9 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p9 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p9 values got=1
+PASS SEQ ldo+ldo p9 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p9 dual: cycles got=9
+PASS SEQ ldo+ldo p9: no request after done got=0
+PASS SEQ ldo+ldo p10 e: order once got=1
+PASS SEQ ldo+ldo p10 dual: order once got=1
+PASS SEQ ldo+ldo p10 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p10 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p10 values got=1
+PASS SEQ ldo+ldo p10 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p10 dual: cycles got=c
+PASS SEQ ldo+ldo p10: no request after done got=0
+PASS SEQ ldo+ldo p11 e: order once got=1
+PASS SEQ ldo+ldo p11 dual: order once got=1
+PASS SEQ ldo+ldo p11 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p11 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p11 values got=1
+PASS SEQ ldo+ldo p11 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p11 dual: cycles got=9
+PASS SEQ ldo+ldo p11: no request after done got=0
+PASS SEQ ldo+ldo p12 e: order once got=1
+PASS SEQ ldo+ldo p12 dual: order once got=1
+PASS SEQ ldo+ldo p12 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p12 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p12 values got=1
+PASS SEQ ldo+ldo p12 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p12 dual: cycles got=c
+PASS SEQ ldo+ldo p12: no request after done got=0
+PASS SEQ ldo+ldo p13 e: order once got=1
+PASS SEQ ldo+ldo p13 dual: order once got=1
+PASS SEQ ldo+ldo p13 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p13 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p13 values got=1
+PASS SEQ ldo+ldo p13 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p13 dual: cycles got=9
+PASS SEQ ldo+ldo p13: no request after done got=0
+PASS SEQ ldo+ldo p14 e: order once got=1
+PASS SEQ ldo+ldo p14 dual: order once got=1
+PASS SEQ ldo+ldo p14 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p14 dual: miss, DSTALL got=103
+PASS SEQ ldo+ldo p14 values got=1
+PASS SEQ ldo+ldo p14 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p14 dual: cycles got=c
+PASS SEQ ldo+ldo p14: no request after done got=0
+PASS SEQ ldo+ldo p15 e: order once got=1
+PASS SEQ ldo+ldo p15 dual: order once got=1
+PASS SEQ ldo+ldo p15 e: miss, DSTALL got=103
+PASS SEQ ldo+ldo p15 dual: miss, DSTALL got=0
+PASS SEQ ldo+ldo p15 values got=1
+PASS SEQ ldo+ldo p15 e: cycles = all hit + 3 got=14
+PASS SEQ ldo+ldo p15 dual: cycles got=9
+PASS SEQ ldo+ldo p15: no request after done got=0
+RESULT: LDO PASSED (864 checks)
+tb_ldo.v:310: $finish called at 20106000 (1ps)
+
 ### Building tb_issue8 ###
 ### Running  tb_issue8 ###
 ============= tb_issue8 (issue8.md, r29) =============
@@ -1632,6 +2512,38 @@ PASS 2 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop (r32 PIU-22) got=14
 PASS SQ-05 SIMD4 = 0: the op writes nothing got=beef
 RESULT: SIMD4 PASSED (27 checks, 20000 vectors)
 tb_simd4.v:109: $finish called at 20166000 (1ps)
+
+### Building tb_dot8 ###
+### Running  tb_dot8 ###
+PASS 3 unit vectors match simd16ref.py vectors8 (count of mismatches) got=0
+PASS SD unit vectors read (count) got=1
+PASS core runs end by STOP got=1
+PASS DRAIN no D / I request 8 cycles after done got=0
+PASS SD-03 slot 4 dot8 got=70
+PASS SD-03 slot 5 dotn8 got=ffffffe2
+PASS SD-03 slot 6 xdot8 got=6c
+PASS SD-03 slot 7 xdotn8 got=2
+PASS SD-03 slot 4 dot8a got=d4
+PASS SD-03 slot 5 dotn8a got=3ca
+PASS SD-03 slot 6 xdot8a got=71
+PASS SD-03 slot 7 xdotn8a got=2
+PASS SD-02 A field 18 (no quad) writes nothing got=cafe
+PASS SD-02 B field 22 (no quad) writes nothing got=cafe
+PASS SD-02 slot 0 writes nothing got=cafe
+PASS SD-02 slot 1 writes nothing got=cafe
+PASS SD-02 slot 2 writes nothing got=cafe
+PASS SD-02 slot 3 writes nothing got=cafe
+PASS SD-03 slot 6 valid next to undefined forms got=70
+PASS SD-04 quad element r47 written in the packet is read old got=70
+PASS SD-04 the packet's ALU write lands (r47) got=0
+PASS SD-05 dot8 reads the FP result in its B quad got=c062
+PASS SD-05 one FP interlock cycle got=1
+PASS SD-06 PIU MUL16 counts the 11 defined dot8 ops got=b
+PASS SD-06 PIU MULPKT counts the 5 packets got=5
+PASS SD-06 PIU-12 ops = alu + mul16 + mul32 + ld + st + ctrl + fpop got=13
+PASS SD-02 SIMD4 = 0: the op writes nothing got=beef
+RESULT: DOT8 PASSED (27 checks, 20000 vectors)
+tb_dot8.v:120: $finish called at 20196000 (1ps)
 
 ### Building tb_verify_piu_pkt ###
 ### Running  tb_verify_piu_pkt ###
@@ -2670,9 +3582,11 @@ RESULT: MEM2 PASSED (53 checks)
 RESULT: MEM2 SYS PASSED (66 checks)
 RESULT: LDD PASSED (97 checks)
 RESULT: LDQ PASSED (528 checks)
+RESULT: LDO PASSED (864 checks)
 RESULT: ISSUE8 PASSED
 RESULT: SIMD16 PASSED (18 checks, 20000 vectors)
 RESULT: SIMD4 PASSED (27 checks, 20000 vectors)
+RESULT: DOT8 PASSED (27 checks, 20000 vectors)
 RESULT: VERIFY PIU PKT PASSED
 RESULT: CODEX CMPBR OLD-BR PASSED
 RESULT: VERIFY CMPBR PKT PASSED

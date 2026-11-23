@@ -10,7 +10,7 @@ module tb_simd4;
     integer pass = 0, fail = 0, fd, n, nv = 0, nexp = -1;
     reg [31:0] sub_r, a0, a1, b0, b1, acc, exp_v;
     wire [31:0] res;
-    simd4 u(.sub(sub_r[2:0]), .a0(a0), .a1(a1), .b0(b0), .b1(b1), .acc(acc), .result(res));
+    simd4 u(.sub(sub_r[2:0]), .q(1'b0), .a2(32'd0), .a3(32'd0), .b2(32'd0), .b3(32'd0), .a0(a0), .a1(a1), .b0(b0), .b1(b1), .acc(acc), .result(res));
     task chk; input [511:0] nm; input [63:0] got, e; begin
         if (got === e) begin pass = pass + 1; $display("PASS %0s got=%0h", nm, got); end
         else begin fail = fail + 1; $display("FAIL %0s got=%0h expected=%0h", nm, got, e); end

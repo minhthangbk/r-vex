@@ -84,6 +84,7 @@ run tb_mem2_sys         "$CORE l1i_cache.v l1d_cache.v coh_bus.v l2_cache.v hw_s
 # r29 B2 (reviews/contracts/ldd.md LDD-01..07): 64-bit loads on the bare, EXT and dual-port cores
 run tb_ldd               "$CORE"                               tb_ldd.v
 run tb_ldq               "$CORE"                               tb_ldq.v
+run tb_ldo               "$CORE"                               tb_ldo.v       # r32 ldo.md LO-02..07: 256-bit loads
 # r28 (reviews/contracts/simd16.md): SIMD16 unit vectors from the reference model, then through the core
 SMREF=${SMREF:-../../../toolchain/sim/simd16ref.py}   # the gate runs a copy of this directory and passes the path
 [ -f "$SMREF" ] || { echo "FAIL tb_simd16: reference model $SMREF not found (set SMREF)"; exit 2; }
@@ -97,6 +98,11 @@ python3 "$SMREF" vectors4 20000 13 > simd4_vec.txt || { echo "FAIL tb_simd4: sim
 wc -l < simd4_vec.txt > simd4_vec.n
 run tb_simd4            "$CORE"                               tb_simd4.v
 rm -f simd4_vec.txt simd4_vec.n
+# r32 simd8.md SD-03: the dot8 family (0x0F imm type 10) against simd16ref.py vectors8
+python3 "$SMREF" vectors8 20000 17 > simd8_vec.txt || { echo "FAIL tb_dot8: simd16ref.py vectors8 failed"; exit 2; }
+wc -l < simd8_vec.txt > simd8_vec.n
+run tb_dot8             "$CORE"                               tb_dot8.v
+rm -f simd8_vec.txt simd8_vec.n
 run tb_verify_piu_pkt    "$CORE"                               tb_verify_piu_pkt.v
 run tb_codex_cmpbr_oldbr "$CORE"                             tb_codex_cmpbr_oldbr.v
 run tb_verify_cmpbr_pkt  "$CORE"                             tb_verify_cmpbr_pkt.v

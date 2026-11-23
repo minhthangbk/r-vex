@@ -6,12 +6,15 @@
 //   s 2 xdot4 = xdot2(a0, b0) + xdot2(a1, b1)   s 3 xdotn4 = xdotn2(a0, b0) + xdotn2(a1, b1)
 //   s 4..7: the same plus the accumulator acc (GR[dst] of the packet, read before the packet's writes)
 //   the core decides validity (slot 4..7, imt 00, even pair fields); this unit only computes
+//   r32 B2 (simd8.md SD-01..): q = 1 (imm type 10, the dot8 family on GR quads A0..A3 / B0..B3): the second pair
+//   (a2, a3) x (b2, b3) adds the same lane form, so dot8 = dot4(A0:A1, B0:B1) + dot4(A2:A3, B2:B3) (+ acc once)
 //======================================================================
 `ifndef RVEX_SIMD4_V
 `define RVEX_SIMD4_V
 module simd4 (
     input  wire [2:0]  sub,
-    input  wire [31:0] a0, a1, b0, b1, acc,
+    input  wire        q,
+    input  wire [31:0] a0, a1, b0, b1, a2, a3, b2, b3, acc,
     output wire [31:0] result
 );
     function [31:0] lane; input [1:0] k; input [31:0] a, b; reg signed [15:0] ah, al, bh, bl; begin
@@ -23,6 +26,7 @@ module simd4 (
             default: lane = al * bh - ah * bl;   // xdotn2
         endcase
     end endfunction
-    assign result = lane(sub[1:0], a0, b0) + lane(sub[1:0], a1, b1) + (sub[2] ? acc : 32'd0);
+    assign result = lane(sub[1:0], a0, b0) + lane(sub[1:0], a1, b1) +
+                    (q ? lane(sub[1:0], a2, b2) + lane(sub[1:0], a3, b3) : 32'd0) + (sub[2] ? acc : 32'd0);
 endmodule
 `endif

@@ -45,6 +45,7 @@ module tb_fpu_pipe;
     function [31:0] ldw; input [5:0] d, b; begin ldw = {`MEM_LDW, `NO_IMM, d, b, 9'd0, 2'b0}; end endfunction
     function [31:0] ldd; input [5:0] d1, d2, b; begin ldd = {`MEM_LDD, 2'b00, d1, b, d2, 3'b000, 2'b0}; end endfunction
     function [31:0] ldq; input [5:0] pa, pb, a; begin ldq = {`MEM_LDQ, 2'b00, pa[5:1], 1'b0, a, pb[5:1], 1'b0, 3'b000, 2'b00}; end endfunction
+    function [31:0] ldo; input [5:0] qa, qb, a; begin ldo = {`MEM_LDO, 2'b00, qa[5:2], 2'b00, a, qb[5:2], 5'd0, 2'b00}; end endfunction
     function [255:0] pk; input [31:0] s7, s6, s5, s4, s3, s2, s1, s0; begin pk = {s7, s6, s5, s4, s3, s2, s1, s0}; end endfunction
     task chk; input [511:0] name; input [63:0] got, expected; begin
         if (got === expected) begin pass = pass + 1; $display("PASS %0s got=%08x", name, got); end
@@ -172,6 +173,14 @@ module tb_fpu_pipe;
         i_rdata = 256'd0; repeat (3) cyc;
         chk("FP-17 BRIMM compare in slot 7 keeps the slot-4 FP write", dut.gr[9], 32'h40700000);
         chk("FP-17 an mtb in slot 6 does not drop the slot-5 FP write", dut.gr[10], 32'h40700000);
+        // T16 FP-14 / LO-05 (r32): fmul r35 (element 3 of quad 32..35), then ldo r32..r35, r36..r39 = 0[r0]: held (quad
+        // match), the load's write is last
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FMUL, 6'd35, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldo(6'd32, 6'd36, 6'd0), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (10) cyc;
+        chk("LO-05 ldo quad destination (element 3): one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("LO-05 ldo quad destination: the load's write is last", dut.gr[35], 32'h11111111);
         // T14 FP-13 an FP op right before STOP still writes its result
         i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};
