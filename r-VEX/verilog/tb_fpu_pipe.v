@@ -12,7 +12,8 @@
 //   wins; T10 MEM base under a D-stall; T11 ldd second destination; T12 ldq pair destination; T13 return reads LR;
 //   T14 an FP op before STOP; T15 BR-only writes (BRIMM compare, mtb) keep a pending FP write (BUG-399); T17 a scalar
 //   0x0F FP op matches by exact field, a pair form by pair (Codex R59-02); T18 the scalar rD of dot8 / dot4, a reserved
-//   FP form and the ldq base match exactly (Codex R60-01); drain with
+//   FP form and the ldq base match exactly (Codex R60-01); T19 the ldo base and quad B (r32 5a F2); T20 one
+//   row per remaining fhit term (dot8 quad A, ldq pair B, dot4 rD / pair B, FP pair rD / rB); drain with
 //   TIMEOUT and idle ports
 // Mutants (mutate.py): FP-M12 (T6), FP-M15 (T7), FP-M16 (T8), FP-M13 (stage register loads on the held cycle only: T1 results wrong), FP-M14 (no
 // interlock: T2 / T4 read the old values), FP-M16 (pair halves not matched: T4), FP-M17 (FPSTALL not counted).
@@ -34,6 +35,9 @@ module tb_fpu_pipe;
     integer nst = 0;
     reg [31:0] st_data = 0;
     always @(posedge clk) if (d_req && d_we) begin nst = nst + 1; st_data = d_wdata; end   // T7: every store presented
+    reg rec = 0;
+    reg [31:0] first_a = 32'hFFFFFFFF;
+    always @(posedge clk) if (rec && d_req && !d_we && first_a == 32'hFFFFFFFF) first_a = d_addr;   // T19: ldo word 0
 
     rvex_core #(.EXT_IMEM(1), .EXT_DMEM(1)) dut(
         .clk(clk), .reset(reset), .start(start), .done(done), .cycles(cycles),
@@ -48,6 +52,7 @@ module tb_fpu_pipe;
     function [31:0] ldd; input [5:0] d1, d2, b; begin ldd = {`MEM_LDD, 2'b00, d1, b, d2, 3'b000, 2'b0}; end endfunction
     function [31:0] ldq; input [5:0] pa, pb, a; begin ldq = {`MEM_LDQ, 2'b00, pa[5:1], 1'b0, a, pb[5:1], 1'b0, 3'b000, 2'b00}; end endfunction
     function [31:0] ldo; input [5:0] qa, qb, a; begin ldo = {`MEM_LDO, 2'b00, qa[5:2], 2'b00, a, qb[5:2], 5'd0, 2'b00}; end endfunction
+    function [31:0] fadd2; input [5:0] d, a, b; begin fadd2 = {`SQ_SIMD4, 2'b01, d, a, b, 3'd3, 2'b00}; end endfunction
     function [255:0] pk; input [31:0] s7, s6, s5, s4, s3, s2, s1, s0; begin pk = {s7, s6, s5, s4, s3, s2, s1, s0}; end endfunction
     task chk; input [511:0] name; input [63:0] got, expected; begin
         if (got === expected) begin pass = pass + 1; $display("PASS %0s got=%08x", name, got); end
@@ -238,6 +243,69 @@ module tb_fpu_pipe;
         i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldq(6'd40, 6'd42, 6'd3), 32'd0, 32'd0); hold;
         i_rdata = 256'd0; repeat (6) cyc;
         chk("FP-14 R60-01 ldq base r3 (the pending GR) is held one cycle", dut.u_piu.fpstall, pc0 + 1);
+        // T19 LO-05 / FP-14 / FP-21 (r32 final verify 5a F2): the base and both quads of an ldo. V1 fadd r3, then
+        // ldo q32, q36 = 0[r3]: held one cycle, word 0 address = the FP result; V2 fadd r37 (element 1 of quad B), then
+        // ldo q40, q36 = 0[r0]: held, the load's write is last; V3 fadd2 r8:r9 (hi lane r9 = 3.25), then ldo q32, q36 =
+        // 0[r9]: held, address = the hi lane; V4 fadd r3, ldo base r2 (r3's pair sibling): not held (LO-M17 / LO-M18)
+        dut.gr[6] = 32'h3F800000; dut.gr[7] = 32'h3F800000; dut.gr[3] = 32'h00000100;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd3, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall; rec = 1; first_a = 32'hFFFFFFFF;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldo(6'd32, 6'd36, 6'd3), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; rec = 0; repeat (10) cyc;
+        chk("LO-05 T19 ldo base pending (r3): one interlock cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("LO-05 T19 ldo base pending (r3): word 0 address = FP result", first_a, 32'h40700000);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd37, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldo(6'd40, 6'd36, 6'd0), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (10) cyc;
+        chk("LO-05 T19 ldo quad B element pending (r37): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("LO-05 T19 ldo quad B: the load's write is last", dut.gr[37], 32'h11111111);
+        dut.gr[9] = 32'h00000200;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, fadd2(6'd8, 6'd4, 6'd6), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall; rec = 1; first_a = 32'hFFFFFFFF;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldo(6'd32, 6'd36, 6'd9), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; rec = 0; repeat (10) cyc;
+        chk("FP-21 T19 pending hi half r9 = ldo base: one cycle", dut.u_piu.fpstall, pc0 + 1);
+        chk("FP-21 T19 ldo base = the hi lane", first_a, 32'h40500000);
+        dut.gr[2] = 32'h00000300;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd3, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldo(6'd32, 6'd36, 6'd2), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (10) cyc;
+        chk("FP-14 T19 ldo base r2 (scalar) is not held by a pending r3", dut.u_piu.fpstall, pc0);
+        // T20 FP-14 (r32 5a F2 class sweep): one row per fhit term that no bench held before: a pending scalar FP write
+        // (fadd, slot 4) named only by that field: dot8 quad A, ldq pair B destination, dot4 rD, dot4 pair B, FP pair rD,
+        // FP pair rB; each packet is held one cycle (FP-M57..FP-M62)
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd6, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b10, 6'd20, 6'd4, 6'd12, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 T20 dot8 quad A element pending (r6 in r4..r7): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd43, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldq(6'd40, 6'd42, 6'd0), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (6) cyc;
+        chk("FP-14 T20 ldq pair B destination pending (r43): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd8, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b00, 6'd8, 6'd4, 6'd6, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 T20 dot4 rD pending (r8): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd7, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b00, 6'd20, 6'd4, 6'd6, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 T20 dot4 pair B half pending (r7): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd13, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, fadd2(6'd12, 6'd4, 6'd6), 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 T20 FP pair rD half pending (r13): one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd7, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, fadd2(6'd20, 6'd4, 6'd6), 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (2) cyc;
+        chk("FP-14 T20 FP pair rB half pending (r7): one cycle", dut.u_piu.fpstall, pc0 + 1);
         // T14 FP-13 an FP op right before STOP still writes its result
         i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};

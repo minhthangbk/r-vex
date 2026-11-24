@@ -695,13 +695,26 @@ PASS FP-14 R60-01 dot4 r8 (scalar rD) is not held by a pending r9 got=0000000000
 PASS FP-14 R60-01 reserved FP form (imm 11 sub 0) not held by r9 got=000000000000000c
 PASS FP-14 R60-01 ldq base r2 (scalar) is not held by a pending r3 got=000000000000000c
 PASS FP-14 R60-01 ldq base r3 (the pending GR) is held one cycle got=000000000000000d
+PASS LO-05 T19 ldo base pending (r3): one interlock cycle got=000000000000000e
+PASS LO-05 T19 ldo base pending (r3): word 0 address = FP result got=0000000040700000
+PASS LO-05 T19 ldo quad B element pending (r37): one cycle got=000000000000000f
+PASS LO-05 T19 ldo quad B: the load's write is last got=0000000011111111
+PASS FP-21 T19 pending hi half r9 = ldo base: one cycle got=0000000000000010
+PASS FP-21 T19 ldo base = the hi lane got=0000000040500000
+PASS FP-14 T19 ldo base r2 (scalar) is not held by a pending r3 got=0000000000000010
+PASS FP-14 T20 dot8 quad A element pending (r6 in r4..r7): one cycle got=0000000000000011
+PASS FP-14 T20 ldq pair B destination pending (r43): one cycle got=0000000000000012
+PASS FP-14 T20 dot4 rD pending (r8): one cycle got=0000000000000013
+PASS FP-14 T20 dot4 pair B half pending (r7): one cycle got=0000000000000014
+PASS FP-14 T20 FP pair rD half pending (r13): one cycle got=0000000000000015
+PASS FP-14 T20 FP pair rB half pending (r7): one cycle got=0000000000000016
 PASS drain: STOP ends the core got=0000000000000001
 PASS FP-13 the FP op before STOP wrote its result got=0000000040700000
 PASS drain: no fetch after STOP got=0000000000000000
 PASS drain: no data access after STOP got=0000000000000000
-FPU PIPE: 53 passed, 0 failed
+FPU PIPE: 66 passed, 0 failed
 RESULT: FPU PIPE PASSED
-tb_fpu_pipe.v:255: $finish called at 1396000 (1ps)
+tb_fpu_pipe.v:323: $finish called at 2556000 (1ps)
 
 ### Building tb_fpx_core ###
 ### Running  tb_fpx_core ###
