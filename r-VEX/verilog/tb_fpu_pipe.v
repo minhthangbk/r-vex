@@ -11,7 +11,8 @@
 //   T8 FP-14: a reader that waits on the fetch is not an FP interlock; T9 FP-17: same-packet FP / ALU WAW, highest slot
 //   wins; T10 MEM base under a D-stall; T11 ldd second destination; T12 ldq pair destination; T13 return reads LR;
 //   T14 an FP op before STOP; T15 BR-only writes (BRIMM compare, mtb) keep a pending FP write (BUG-399); T17 a scalar
-//   0x0F FP op matches by exact field, a pair form by pair (Codex R59-02); drain with
+//   0x0F FP op matches by exact field, a pair form by pair (Codex R59-02); T18 the scalar rD of dot8 / dot4, a reserved
+//   FP form and the ldq base match exactly (Codex R60-01); drain with
 //   TIMEOUT and idle ports
 // Mutants (mutate.py): FP-M12 (T6), FP-M15 (T7), FP-M16 (T8), FP-M13 (stage register loads on the held cycle only: T1 results wrong), FP-M14 (no
 // interlock: T2 / T4 read the old values), FP-M16 (pair halves not matched: T4), FP-M17 (FPSTALL not counted).
@@ -200,6 +201,43 @@ module tb_fpu_pipe;
         i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b01, 6'd12, 6'd8, 6'd4, 3'd3, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
         i_rdata = 256'd0; repeat (2) cyc;
         chk("FP-14 R59-02 pair fadd2 reading r8:r9 is held one cycle", dut.u_piu.fpstall, pc0 + 1);
+        // T18 FP-14 (r32 Codex R60-01): each field by its own width. With r9 pending (fadd r9, slot 4), in slot 4:
+        // a) dot8 r8 = q4 . q12 (scalar rD): not held; b) dot8 r9 = q4 . q12: held (nearest invalid);
+        // c) dot4 r8 = r4:r5 . r6:r7 (scalar rD): not held; d) a reserved FP form (imm type 11 sub-op 0, fields 8, 4, 6):
+        // not held. With r3 pending, in slot 2: e) ldq r40:r41, r42:r43 = 0[r2] (scalar base): not held;
+        // f) ldq r40:r41, r42:r43 = 0[r3]: held (nearest invalid)
+        dut.gr[2] = 32'd0; dut.gr[3] = 32'd0;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b10, 6'd8, 6'd4, 6'd12, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R60-01 dot8 r8 (scalar rD) is not held by a pending r9", dut.u_piu.fpstall, pc0);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b10, 6'd9, 6'd4, 6'd12, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R60-01 dot8 r9 (the pending GR) is held one cycle", dut.u_piu.fpstall, pc0 + 1);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b00, 6'd8, 6'd4, 6'd6, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R60-01 dot4 r8 (scalar rD) is not held by a pending r9", dut.u_piu.fpstall, pc0);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd9, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, {`SQ_SIMD4, 2'b11, 6'd8, 6'd4, 6'd6, 3'd0, 2'b00}, 32'd0, 32'd0, 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; cyc;
+        chk("FP-14 R60-01 reserved FP form (imm 11 sub 0) not held by r9", dut.u_piu.fpstall, pc0);
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd3, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldq(6'd40, 6'd42, 6'd2), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (6) cyc;
+        chk("FP-14 R60-01 ldq base r2 (scalar) is not held by a pending r3", dut.u_piu.fpstall, pc0);
+        dut.gr[3] = 32'd0;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd3, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
+        pc0 = dut.u_piu.fpstall;
+        i_rdata = pk(32'd0, 32'd0, 32'd0, 32'd0, 32'd0, ldq(6'd40, 6'd42, 6'd3), 32'd0, 32'd0); hold;
+        i_rdata = 256'd0; repeat (6) cyc;
+        chk("FP-14 R60-01 ldq base r3 (the pending GR) is held one cycle", dut.u_piu.fpstall, pc0 + 1);
         // T14 FP-13 an FP op right before STOP still writes its result
         i_rdata = pk(32'd0, 32'd0, 32'd0, rr(`FPU_FADD, 6'd48, 6'd4, 6'd5), 32'd0, 32'd0, 32'd0, 32'd0); cyc;
         i_rdata = {224'd0, `OP_STOP, 25'd0};

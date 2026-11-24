@@ -551,16 +551,23 @@ module rvex_core #(
     reg  [5:0] fpp_d4, fpp_d5, fpp_d6, fpp_d7;
     // pair: the slot may hold a pair op (ldq in slots 2-3, a 4-lane op in slots 4-7); a field matches by pair only when
     // the syllable is that op (r31: other ops by exact field, so an FP result in r9 does not hold a reader of r8)
-    function fhit; input [5:0] d; input [31:0] s; input pair; reg pr, qd, od; begin
-        // Codex R59-02 (FP-14): a 0x0F syllable matches by pair only for a pair form (the 4-lane ops, imm type 00, and the
-        // FP pair / cross-lane forms, fpx_pair); the scalar fmadd / fmsub / fmrsub (imm type 01, sub-op 0..2) by exact field
-        pr = pair && (s[31:25] == `MEM_LDQ || (s[31:25] == `SQ_SIMD4 && fpx_pair(s[24:23], s[4:2])));
-        // r32 SD-05: a dot8 (0x0F imm type 10) reads the quads [16:13] / [10:7]
+    // FP-19: the defined forms of the FP family (imm type 01 sub-ops 0..7, imm type 11 sub-ops 4..6)
+    function fpx_def; input [1:0] imt; input [2:0] sub; begin
+        fpx_def = imt == 2'b01 || (imt == 2'b11 && sub >= 3'd4 && sub <= 3'd6); end endfunction
+    function fhit; input [5:0] d; input [31:0] s; input pair; reg lq, sq, fp, qd, od; begin
+        // Codex R59-02 / R60-01 (FP-14): every field matches by its own width: a pair field by pair, a quad field by quad, a
+        // scalar field exactly (the rD of dot4 / dot8 / scalar fmadd, the base of ldq / ldo); an undefined 0x0F form exactly
+        lq = pair && s[31:25] == `MEM_LDQ;                            // LQ-01: pairs [22:18] / [10:6], base [16:11]
+        sq = pair && s[31:25] == `SQ_SIMD4 && s[24:23] == 2'b00;      // SQ-01: rD [22:17], pairs [16:12] / [10:6]
+        fp = pair && s[31:25] == `SQ_SIMD4 && fpx_def(s[24:23], s[4:2]) && fpx_pair(s[24:23], s[4:2]);   // FP-20: 3 pairs
+        // r32 SD-05: a dot8 (0x0F imm type 10) writes the scalar rD [22:17], reads the quads [16:13] / [10:7]
         qd = pair && s[31:25] == `SQ_SIMD4 && s[24:23] == 2'b10;
         od = pair && s[31:25] == `MEM_LDO;        // r32 LO-05: an ldo writes the quads [22:19] / [10:7], reads base [16:11]
         fhit = od ? (s[22:19] == d[5:2] || s[16:11] == d || s[10:7] == d[5:2])
-             : qd ? (s[22:18] == d[5:1] || s[16:13] == d[5:2] || s[10:7] == d[5:2])
-             : pr ? (s[22:18] == d[5:1] || s[16:12] == d[5:1] || s[10:6] == d[5:1])
+             : qd ? (s[22:17] == d || s[16:13] == d[5:2] || s[10:7] == d[5:2])
+             : lq ? (s[22:18] == d[5:1] || s[16:11] == d || s[10:6] == d[5:1])
+             : sq ? (s[22:17] == d || s[16:12] == d[5:1] || s[10:6] == d[5:1])
+             : fp ? (s[22:18] == d[5:1] || s[16:12] == d[5:1] || s[10:6] == d[5:1])
                   : (s[22:17] == d || s[16:11] == d || s[10:5] == d); end endfunction
     // every signal the match reads is an argument (a continuous assignment re-evaluates on its operands only)
     function fdep; input [5:0] d; input [255:0] pk; input c0; begin
